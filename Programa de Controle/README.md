@@ -125,13 +125,14 @@ Confira se o GitHub recebeu estes arquivos na raiz do repositorio:
 - `Dockerfile`
 - `.dockerignore`
 - `railway.json`
-- `requirements.txt`
 - `server.py`
 - `index.html`
 - `app.js`
 - `styles.css`
 
 O arquivo `railway.json` esta configurado para usar `DOCKERFILE`, que evita depender da deteccao automatica da Railway.
+
+O `Dockerfile` instala a dependencia PostgreSQL diretamente, entao o deploy nao depende mais do arquivo `requirements.txt`.
 
 Na tela da Railway, se o log continuar mostrando `railpack process exited with an error`, confira tambem:
 
