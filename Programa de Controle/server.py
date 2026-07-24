@@ -15,6 +15,7 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parent
+os.chdir(ROOT)
 DB_PATH = ROOT / "estoque.db"
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 NODE_ENV = os.environ.get("NODE_ENV", os.environ.get("APP_ENV", "development")).lower()

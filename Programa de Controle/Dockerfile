@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir "psycopg[binary]==3.2.9"
 
 COPY . .
 
-CMD ["python", "server.py"]
+CMD ["sh", "-c", "SERVER=$(find /app -name server.py -print -quit); cd $(dirname \"$SERVER\") && python server.py"]

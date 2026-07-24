@@ -141,3 +141,5 @@ Na tela da Railway, se o log continuar mostrando `railpack process exited with a
 - Em `Settings > Build`, o builder esta como Dockerfile.
 - Se existir a opcao de caminho do Dockerfile, informe `Dockerfile`.
 - Como alternativa, em `Variables`, adicione `RAILWAY_DOCKERFILE_PATH=Dockerfile`.
+
+Se o log mostrar `python: can't open file '/app/server.py'`, o deploy recebeu os arquivos em uma subpasta ou o `server.py` nao foi enviado na raiz. O `Dockerfile` atual procura o `server.py` dentro de `/app` antes de iniciar, mas o ideal e confirmar no GitHub se o arquivo `server.py` foi enviado junto com `index.html`, `app.js` e `styles.css`.
