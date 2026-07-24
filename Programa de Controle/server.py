@@ -919,8 +919,11 @@ def bootstrap_data(connection, user, payload):
 
 
 def main():
-    with db():
-        pass
+    try:
+        with db():
+            pass
+    except Exception as error:
+        print(f"Aviso: nao foi possivel preparar o banco na inicializacao: {public_error(error)}", file=sys.stderr)
     host = "0.0.0.0"
     port = int(os.environ.get("PORT", "4173"))
     server = ThreadingHTTPServer((host, port), Handler)
