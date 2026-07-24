@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Controle Amazon - Estoque</title>
+    <link rel="stylesheet" href="styles.css?v=32" />
+  </head>
+  <body>
+    <aside class="sidebar" aria-label="Navegacao principal">
+      <div class="brand">
+        <span class="brand-mark">A</span>
+        <div>
+          <strong>Controle Amazon</strong>
+          <small>Operacao FBA</small>
+        </div>
+      </div>
+      <div id="userPanel" class="user-panel" hidden>
+        <span id="currentUserName">Usuario</span>
+        <button id="logoutButton" type="button">Sair</button>
+      </div>
+      <nav class="nav-tabs">
+        <button type="button" class="active" data-tab="dashboard">Dashboard</button>
+        <button type="button" data-tab="inventory">Estoque</button>
+        <button type="button" data-tab="shipments">Envios Amazon</button>
+        <button type="button" data-tab="purchases">Compras</button>
+        <button type="button" data-tab="dre">DRE Mensal</button>
+        <button type="button" data-tab="cash">Caixa</button>
+        <button type="button" data-tab="account">Conta</button>
+      </nav>
+    </aside>
+
+    <main class="app-shell">
+      <section id="dashboardView" class="tab-view">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Visao geral</p>
+            <h1>Dashboard</h1>
+          </div>
+          <button id="toggleDashboardMoney" class="dashboard-eye-button" type="button" aria-label="Ocultar valores em dinheiro" title="Ocultar valores em dinheiro">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </header>
+
+        <section class="metrics" aria-label="Resumo geral">
+          <div class="metric">
+            <span>Caixa total</span>
+            <strong id="dashboardCashTotal" data-money-value>R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Valor em estoque</span>
+            <strong id="dashboardStockValue" data-money-value>R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>A enviar Amazon</span>
+            <strong id="dashboardSendQty">0</strong>
+          </div>
+          <div class="metric">
+            <span>A comprar</span>
+            <strong id="dashboardBuyQty">0</strong>
+          </div>
+        </section>
+
+        <section class="dashboard-grid" aria-label="Indicadores principais">
+          <div class="dashboard-panel">
+            <div class="section-heading">
+              <div>
+                <h3>Estoque</h3>
+                <p>Alertas calculados pelos produtos cadastrados.</p>
+              </div>
+            </div>
+            <div id="dashboardInventoryList" class="dashboard-list"></div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="section-heading">
+              <div>
+                <h3>Compras</h3>
+                <p>Status dos pedidos cadastrados.</p>
+              </div>
+            </div>
+            <div id="dashboardPurchasesList" class="dashboard-list"></div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="section-heading">
+              <div>
+                <h3>Envios Amazon</h3>
+                <p>Proximo agendamento e itens previstos.</p>
+              </div>
+            </div>
+            <div id="dashboardShipmentsList" class="dashboard-list"></div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="section-heading">
+              <div>
+                <h3>DRE</h3>
+                <p>Ultimo fechamento mensal cadastrado.</p>
+              </div>
+            </div>
+            <div id="dashboardDreList" class="dashboard-list"></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="inventoryView" class="tab-view" hidden>
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Gestao de estoque</p>
+            <h1>Estoque</h1>
+          </div>
+          <div class="header-actions">
+            <button id="openImportModal" class="secondary-button" type="button">Importar Planilha</button>
+            <button id="openProductModal" class="primary-button" type="button">
+              <span>+</span>
+              Cadastrar Produto
+            </button>
+          </div>
+        </header>
+
+        <section class="metrics" aria-label="Resumo do estoque">
+          <div class="metric">
+            <span>Produtos</span>
+            <strong id="metricProducts">0</strong>
+          </div>
+          <div class="metric">
+            <span>Valor em estoque</span>
+            <strong id="metricValue">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>A enviar</span>
+            <strong id="metricSend">0</strong>
+          </div>
+          <div class="metric">
+            <span>A comprar</span>
+            <strong id="metricBuy">0</strong>
+          </div>
+        </section>
+
+        <section class="toolbar" aria-label="Filtros de estoque">
+          <label class="search-field">
+            <span>Buscar</span>
+            <input id="searchInput" type="search" placeholder="Nome, ASIN ou SKU" autocomplete="off" />
+          </label>
+          <label class="select-field">
+            <span>Status</span>
+            <select id="statusFilter">
+              <option value="all">Todos</option>
+              <option value="adequado">Estoque adequado</option>
+              <option value="enviar">Enviar para Amazon</option>
+              <option value="comprar">Comprar</option>
+              <option value="sem-vendas">Sem vendas recentes</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="table-wrap" aria-label="Tabela de estoque">
+          <table>
+            <thead>
+              <tr>
+                <th>ASIN</th>
+                <th>SKU</th>
+                <th>Nome do produto</th>
+                <th>Estoque no galpao</th>
+                <th>Estoque no FBA Amazon</th>
+                <th>Estoque total</th>
+                <th>Vendas dos ultimos 15 dias</th>
+                <th>Quantidade sugerida para enviar a Amazon</th>
+                <th>Necessidade de compra</th>
+                <th>Custo medio unitario</th>
+                <th>Valor total em estoque</th>
+                <th>Status</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryBody"></tbody>
+          </table>
+          <div id="emptyState" class="empty-state" hidden>
+            <strong>Nenhum produto encontrado</strong>
+            <span>Cadastre um produto ou ajuste os filtros para visualizar o estoque.</span>
+          </div>
+        </section>
+      </section>
+
+      <section id="shipmentsView" class="tab-view" hidden>
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Agendamentos FBA</p>
+            <h1>Envios Amazon</h1>
+          </div>
+          <button id="openShipmentModal" class="primary-button" type="button">
+            <span>+</span>
+            Cadastrar Agendamento
+          </button>
+        </header>
+
+        <section class="metrics" aria-label="Resumo de agendamentos">
+          <div class="metric">
+            <span>Agendamentos</span>
+            <strong id="metricShipments">0</strong>
+          </div>
+          <div class="metric">
+            <span>Itens agendados</span>
+            <strong id="metricShipmentItems">0</strong>
+          </div>
+          <div class="metric">
+            <span>Proximo envio</span>
+            <strong id="metricNextShipment">-</strong>
+          </div>
+          <div class="metric">
+            <span>Produtos diferentes</span>
+            <strong id="metricShipmentProducts">0</strong>
+          </div>
+        </section>
+
+        <section class="filters shipments-filters" aria-label="Filtros de agendamentos">
+          <label>
+            Mostrar agendamentos
+            <select id="shipmentDateFilter">
+              <option value="upcoming">Proximos</option>
+              <option value="past">Antigos</option>
+              <option value="all">Todos</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="table-wrap" aria-label="Tabela de agendamentos Amazon">
+          <table class="shipments-table">
+            <thead>
+              <tr>
+                <th>ID do agendamento</th>
+                <th>Data</th>
+                <th>Horario</th>
+                <th>Local Amazon</th>
+                <th>Produtos para envio</th>
+                <th class="numeric">Quantidade total</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody id="shipmentsBody"></tbody>
+          </table>
+          <div id="emptyShipmentsState" class="empty-state" hidden>
+            <strong>Nenhum agendamento cadastrado</strong>
+            <span>Cadastre um envio para organizar os produtos que serao enviados para a Amazon.</span>
+          </div>
+        </section>
+      </section>
+
+      <section id="purchasesView" class="tab-view" hidden>
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Pedidos de compra</p>
+            <h1>Compras</h1>
+          </div>
+          <div class="header-actions">
+            <button id="exportRetiradaPdf" class="secondary-button" type="button">Exportar PDF Retiradas</button>
+            <button id="openPurchaseModal" class="primary-button" type="button">
+              <span>+</span>
+              Cadastrar Compra
+            </button>
+          </div>
+        </header>
+
+        <section class="metrics" aria-label="Resumo de compras">
+          <div class="metric">
+            <span>Pedidos</span>
+            <strong id="metricPurchases">0</strong>
+          </div>
+          <div class="metric">
+            <span>Valor em pedidos</span>
+            <strong id="metricPurchaseValue">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>A retirar</span>
+            <strong id="metricPurchasePickup">0</strong>
+          </div>
+          <div class="metric">
+            <span>Fornecedores</span>
+            <strong id="metricPurchaseSuppliers">0</strong>
+          </div>
+        </section>
+
+        <section class="toolbar" aria-label="Filtros de compras">
+          <label class="select-field">
+            <span>Status</span>
+            <select id="purchaseStatusFilter">
+              <option value="open" selected>Em aberto</option>
+              <option value="all">Todos</option>
+              <option value="Comprar">Comprar</option>
+              <option value="Pedido">Pedido</option>
+              <option value="Pago">Pago</option>
+              <option value="Retirar">Retirar</option>
+              <option value="Entregue">Entregue</option>
+              <option value="Recebido">Recebido</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="table-wrap" aria-label="Tabela de compras">
+          <table class="purchases-table">
+            <thead>
+              <tr>
+                <th><input id="selectAllRetiradaPurchases" type="checkbox" aria-label="Selecionar compras em retirada" /></th>
+                <th>Produtos</th>
+                <th class="numeric">Quantidade</th>
+                <th class="numeric">Valor do pedido</th>
+                <th class="numeric">Quantidade de caixas</th>
+                <th>Tamanho da caixa</th>
+                <th>Fornecedor</th>
+                <th>No. do pedido</th>
+                <th>Status</th>
+                <th>Endereco</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody id="purchasesBody"></tbody>
+          </table>
+          <div id="emptyPurchasesState" class="empty-state" hidden>
+            <strong>Nenhuma compra cadastrada</strong>
+            <span>Cadastre pedidos de compra para acompanhar fornecedores, status e retirada.</span>
+          </div>
+        </section>
+      </section>
+
+      <section id="dreView" class="tab-view" hidden>
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Fechamento mensal</p>
+            <h1>DRE Mensal</h1>
+          </div>
+          <button id="openDreModal" class="primary-button" type="button">
+            <span>+</span>
+            Cadastrar Mes
+          </button>
+        </header>
+
+        <section class="metrics dre-metrics" aria-label="Resumo da DRE">
+          <div class="metric">
+            <span>Faturamento 2026</span>
+            <strong id="metricDreRevenue">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Entradas 2026</span>
+            <strong id="metricDreIncome">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Saidas 2026</span>
+            <strong id="metricDreExpense">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Lucro liquido 2026</span>
+            <strong id="metricDreProfit">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Margem 2026</span>
+            <strong id="metricDreMargin">0%</strong>
+          </div>
+        </section>
+
+        <section class="table-wrap" aria-label="Tabela de DRE mensal">
+          <table class="dre-table">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th class="numeric">Faturamento</th>
+                <th class="numeric">Entradas</th>
+                <th class="numeric">Saidas</th>
+                <th class="numeric">Lucro liquido</th>
+                <th class="numeric">Margem</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody id="dreBody"></tbody>
+          </table>
+          <div id="emptyDreState" class="empty-state" hidden>
+            <strong>Nenhum fechamento cadastrado</strong>
+            <span>Cadastre o fechamento do mes para acompanhar entradas, saidas, lucro e margem.</span>
+          </div>
+        </section>
+      </section>
+
+      <section id="cashView" class="tab-view" hidden>
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Posicao financeira</p>
+            <h1>Caixa</h1>
+          </div>
+        </header>
+
+        <section class="metrics" aria-label="Resumo de caixa">
+          <div class="metric">
+            <span>Valor em estoque</span>
+            <strong id="metricCashStock">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Valor em conta</span>
+            <strong id="metricCashAccount">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>A receber Amazon</span>
+            <strong id="metricCashAmazon">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Caixa total</span>
+            <strong id="metricCashTotal">R$ 0,00</strong>
+          </div>
+        </section>
+
+        <section class="cash-panel" aria-label="Atualizar caixa">
+          <form id="cashForm">
+            <div class="form-grid">
+              <label>
+                Valor em conta
+                <input id="cashAccountValue" type="number" min="0" step="0.01" required />
+              </label>
+              <label>
+                Valor a receber da Amazon
+                <input id="cashAmazonReceivable" type="number" min="0" step="0.01" required />
+              </label>
+            </div>
+            <p id="cashError" class="form-error" role="alert"></p>
+            <div class="modal-actions">
+              <button class="primary-button" type="submit">Salvar Caixa</button>
+            </div>
+          </form>
+        </section>
+      </section>
+
+      <section id="accountView" class="tab-view" hidden>
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Conta PJ</p>
+            <h1>Conta</h1>
+          </div>
+          <div class="header-actions">
+            <button id="openAccountEntryModal" class="primary-button" type="button">
+              <span>+</span>
+              Cadastrar Lancamento
+            </button>
+            <button id="openAccountBulkModal" class="secondary-button" type="button">Cadastrar Varios</button>
+            <button id="exportAccountPdf" class="secondary-button" type="button">Exportar PDF</button>
+          </div>
+        </header>
+
+        <section class="filters" aria-label="Filtro mensal da conta">
+          <label>
+            Mes da planilha
+            <input id="accountMonthFilter" type="month" />
+          </label>
+        </section>
+
+        <section class="cash-panel account-opening-panel" aria-label="Saldo inicial do mes">
+          <form id="accountOpeningForm">
+            <div class="form-grid">
+              <label>
+                Saldo no comeco do mes
+                <input id="accountOpeningBalance" type="number" step="0.01" required />
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button class="secondary-button" type="submit">Salvar Saldo Inicial</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="metrics" aria-label="Resumo da conta">
+          <div class="metric">
+            <span>Saldo inicial</span>
+            <strong id="metricAccountOpening">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Entradas do mes</span>
+            <strong id="metricAccountIn">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Saidas do mes</span>
+            <strong id="metricAccountOut">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Saldo final do mes</span>
+            <strong id="metricAccountBalance">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Lancamentos</span>
+            <strong id="metricAccountEntries">0</strong>
+          </div>
+        </section>
+
+        <section class="table-wrap" aria-label="Planilha mensal da conta PJ">
+          <table class="account-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Descricao</th>
+                <th>Tipo</th>
+                <th class="numeric">Valor</th>
+                <th>Forma de pagamento</th>
+                <th>No. nota fiscal</th>
+                <th>Data nota fiscal</th>
+                <th>Parcelas</th>
+                <th>Observacoes</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody id="accountBody"></tbody>
+          </table>
+          <div id="emptyAccountState" class="empty-state" hidden>
+            <strong>Nenhum lancamento neste mes</strong>
+            <span>Cadastre entradas e saidas para acompanhar a movimentacao da conta PJ.</span>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <section id="loginOverlay" class="login-overlay" hidden>
+      <form id="loginForm" class="login-card">
+        <div>
+          <p class="eyebrow">Acesso seguro</p>
+          <h1>Entrar no sistema</h1>
+        </div>
+        <label>
+          Email
+          <input id="loginEmail" type="email" autocomplete="username" required />
+        </label>
+        <label>
+          Senha
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <p id="loginError" class="form-error" role="alert"></p>
+        <button class="primary-button" type="submit">Entrar</button>
+      </form>
+    </section>
+
+    <dialog id="productDialog" class="modal">
+      <form id="productForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Produto</p>
+            <h2 id="productDialogTitle">Cadastrar Produto</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-close-dialog aria-label="Fechar">x</button>
+        </div>
+
+        <input type="hidden" id="productId" />
+        <div class="form-grid">
+          <label>
+            ASIN
+            <input id="asin" required maxlength="20" />
+          </label>
+          <label>
+            SKU
+            <input id="sku" required maxlength="60" />
+          </label>
+          <label class="span-2">
+            Nome do produto
+            <input id="productName" required maxlength="140" />
+          </label>
+          <div class="photo-field span-2">
+            <div class="photo-preview" id="photoPreview">
+              <span>Sem foto</span>
+            </div>
+            <div class="photo-controls">
+              <label>
+                Foto do produto
+                <input id="productPhoto" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              </label>
+              <button id="removePhoto" class="ghost-button" type="button">Remover foto</button>
+            </div>
+          </div>
+          <label>
+            Quantidade no galpao
+            <input id="warehouseStock" type="number" min="0" step="1" required />
+          </label>
+          <label>
+            Quantidade no FBA
+            <input id="fbaStock" type="number" min="0" step="1" required />
+          </label>
+          <label>
+            Vendas dos ultimos 15 dias
+            <input id="last15Sales" type="number" min="0" step="1" required />
+          </label>
+        </div>
+
+        <div class="batch-section">
+          <div class="section-heading">
+            <div>
+              <h3>Lotes de compra</h3>
+              <p>A soma dos lotes precisa bater com o estoque total.</p>
+            </div>
+            <button id="addBatchRow" class="secondary-button" type="button">Adicionar lote</button>
+          </div>
+          <div id="batchRows" class="batch-rows"></div>
+        </div>
+
+        <p id="productError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>Cancelar</button>
+          <button class="primary-button" type="submit">Salvar Produto</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="simpleDialog" class="modal small-modal">
+      <form id="simpleForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow" id="simpleEyebrow">Acao</p>
+            <h2 id="simpleTitle">Registrar</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-close-dialog aria-label="Fechar">x</button>
+        </div>
+        <div id="simpleContent" class="simple-content"></div>
+        <p id="simpleError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>Cancelar</button>
+          <button id="simpleSubmit" class="primary-button" type="submit">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="importDialog" class="modal details-modal">
+      <form id="importForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Atualizacao em lote</p>
+            <h2>Importar Planilha</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-close-dialog aria-label="Fechar">x</button>
+        </div>
+
+        <div class="import-layout">
+          <label>
+            Arquivo CSV ou TSV
+            <input id="importFile" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" required />
+          </label>
+          <div class="details-item">
+            <span>Formato esperado</span>
+            <strong>ASIN, Quantidade disponivel, Vendas</strong>
+            <p>Exporte sua planilha como CSV. A quantidade disponivel atualiza o estoque no FBA Amazon.</p>
+          </div>
+          <button id="downloadTemplate" class="secondary-button" type="button">Baixar modelo CSV</button>
+        </div>
+
+        <div id="importPreview" class="import-preview" hidden></div>
+        <p id="importError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>Cancelar</button>
+          <button id="applyImport" class="primary-button" type="submit" disabled>Aplicar Atualizacao</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="shipmentDialog" class="modal details-modal">
+      <form id="shipmentForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Envio Amazon</p>
+            <h2 id="shipmentDialogTitle">Cadastrar Agendamento</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-close-dialog aria-label="Fechar">x</button>
+        </div>
+
+        <input type="hidden" id="shipmentRecordId" />
+        <div class="form-grid">
+          <label>
+            ID do agendamento
+            <input id="shipmentScheduleId" required maxlength="60" placeholder="Ex: FBA15D2ABCD" />
+          </label>
+          <label>
+            Data do agendamento
+            <input id="shipmentDate" type="date" required />
+          </label>
+          <label>
+            Horario do agendamento
+            <input id="shipmentTime" type="time" required />
+          </label>
+          <label class="span-2">
+            Local de envio para Amazon
+            <input id="shipmentLocation" required maxlength="140" placeholder="Ex: CD Amazon Cajamar" />
+          </label>
+        </div>
+
+        <div class="batch-section">
+          <div class="section-heading">
+            <div>
+              <h3>Produtos para envio</h3>
+              <p>Selecione os produtos e a quantidade planejada para o agendamento.</p>
+            </div>
+            <button id="addShipmentItem" class="secondary-button" type="button">Adicionar produto</button>
+          </div>
+          <div id="shipmentProductRows" class="shipment-product-rows"></div>
+        </div>
+
+        <p id="shipmentError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>Cancelar</button>
+          <button class="primary-button" type="submit">Salvar Agendamento</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="purchaseDialog" class="modal details-modal">
+      <form id="purchaseForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Pedido de compra</p>
+            <h2 id="purchaseDialogTitle">Cadastrar Compra</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-close-dialog aria-label="Fechar">x</button>
+        </div>
+
+        <input type="hidden" id="purchaseRecordId" />
+        <div class="form-grid">
+          <label>
+            Fornecedor
+            <select id="purchaseSupplierSelect"></select>
+          </label>
+          <label>
+            Nome do fornecedor
+            <input id="purchaseSupplierName" required maxlength="120" />
+          </label>
+          <label class="span-2">
+            Endereco
+            <input id="purchaseAddress" required maxlength="220" />
+          </label>
+          <label>
+            Valor total do pedido
+            <input id="purchaseValue" type="number" min="0" step="0.01" readonly required />
+          </label>
+          <label>
+            Quantidade de caixas
+            <input id="purchaseBoxes" type="number" min="0" step="1" required />
+          </label>
+          <label>
+            Tamanho da caixa
+            <input id="purchaseBoxSize" maxlength="80" placeholder="Ex: 60x40x40 cm" required />
+          </label>
+          <label>
+            No. do pedido
+            <input id="purchaseOrderNumber" maxlength="80" placeholder="Opcional" />
+          </label>
+          <label>
+            Status
+            <select id="purchaseStatus" required>
+              <option value="Comprar">Comprar</option>
+              <option value="Pedido">Pedido</option>
+              <option value="Pago">Pago</option>
+              <option value="Retirar">Retirar</option>
+              <option value="Entregue">Entregue</option>
+              <option value="Recebido">Recebido</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="batch-section">
+          <div class="section-heading">
+            <div>
+              <h3>Produtos da compra</h3>
+              <p>Adicione todos os produtos comprados deste fornecedor.</p>
+            </div>
+            <button id="addPurchaseItem" class="secondary-button" type="button">Adicionar produto</button>
+          </div>
+          <div id="purchaseItemRows" class="purchase-item-rows"></div>
+        </div>
+
+        <div class="batch-section">
+          <div class="section-heading">
+            <div>
+              <h3>Imagem para retirada</h3>
+              <p>Opcional. Use uma imagem nitida do pedido; ela entra no PDF exportado em alta qualidade.</p>
+            </div>
+          </div>
+          <div class="photo-field">
+            <div class="photo-preview" id="purchaseAttachmentPreview">
+              <span>Sem imagem</span>
+            </div>
+            <div class="photo-controls">
+              <label>
+                Imagem da compra
+                <input id="purchaseAttachment" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              </label>
+              <button id="removePurchaseAttachment" class="ghost-button" type="button">Remover imagem</button>
+            </div>
+          </div>
+        </div>
+
+        <p id="purchaseError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>Cancelar</button>
+          <button class="primary-button" type="submit">Salvar Compra</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="dreDialog" class="modal details-modal">
+      <form id="dreForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Fechamento mensal</p>
+            <h2 id="dreDialogTitle">Cadastrar Mes</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-close-dialog aria-label="Fechar">x</button>
+        </div>
+
+        <input type="hidden" id="dreRecordId" />
+        <div class="form-grid">
+          <label>
+            Mes
+            <input id="dreMonth" type="month" required />
+          </label>
+          <label>
+            Faturamento
+            <input id="dreRevenue" type="number" min="0" step="0.01" required />
+          </label>
+        </div>
+
+        <div class="dre-editor">
+          <section class="batch-section">
+            <div class="section-heading">
+              <div>
+                <h3>Entradas</h3>
+                <p>O total de entradas nao soma o faturamento.</p>
+              </div>
+              <button id="addDreIncome" class="secondary-button" type="button">Adicionar entrada</button>
+            </div>
+            <div id="dreIncomeRows" class="dre-line-rows"></div>
+          </section>
+
+          <section class="batch-section">
+            <div class="section-heading">
+              <div>
+                <h3>Saidas</h3>
+                <p>Inclua custos fixos, impostos e qualquer despesa extra do mes.</p>
+              </div>
+              <button id="addDreExpense" class="secondary-button" type="button">Adicionar saida</button>
+            </div>
+            <div id="dreExpenseRows" class="dre-line-rows"></div>
+          </section>
+        </div>
+
+        <section class="dre-summary" aria-label="Resumo calculado da DRE">
+          <div>
+            <span>Entradas</span>
+            <strong id="dreIncomeTotal">R$ 0,00</strong>
+          </div>
+          <div>
+            <span>Saidas</span>
+            <strong id="dreExpenseTotal">R$ 0,00</strong>
+          </div>
+          <div>
+            <span>Lucro liquido</span>
+            <strong id="dreNetProfit">R$ 0,00</strong>
+          </div>
+          <div>
+            <span>Margem</span>
+            <strong id="dreMargin">0%</strong>
+          </div>
+        </section>
+
+        <p id="dreError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>Cancelar</button>
+          <button class="primary-button" type="submit">Salvar Fechamento</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="accountEntryDialog" class="modal details-modal">
+      <form id="accountEntryForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Conta PJ</p>
+            <h2 id="accountEntryDialogTitle">Cadastrar Lancamento</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-close-dialog aria-label="Fechar">x</button>
+        </div>
+
+        <input type="hidden" id="accountEntryRecordId" />
+        <div class="form-grid">
+          <label>
+            Data
+            <input id="accountEntryDate" type="date" required />
+          </label>
+          <label>
+            Tipo
+            <select id="accountEntryType" required>
+              <option value="Entrada">Entrada</option>
+              <option value="Saida">Saida</option>
+            </select>
+          </label>
+          <label class="span-2">
+            Descricao
+            <input id="accountEntryDescription" required maxlength="180" placeholder="Ex: Compra de produto, recebimento, tarifa" />
+          </label>
+          <label>
+            Valor
+            <input id="accountEntryValue" type="number" min="0" step="0.01" required />
+          </label>
+          <label>
+            Forma de pagamento
+            <select id="accountEntryPayment" required>
+              <option value="Pix">Pix</option>
+              <option value="Boleto">Boleto</option>
+              <option value="Transferencia">Transferencia</option>
+            </select>
+          </label>
+          <label>
+            No. nota fiscal
+            <input id="accountEntryInvoiceNumber" maxlength="80" />
+          </label>
+          <label>
+            Data da nota fiscal
+            <input id="accountEntryInvoiceDate" type="date" />
+          </label>
+          <label>
+            Parcelas
+            <input id="accountEntryInstallments" maxlength="40" placeholder="Ex: 1/3 ou 3x" />
+          </label>
+          <label class="span-2">
+            Observacoes
+            <textarea id="accountEntryNotes" rows="3" maxlength="500"></textarea>
+          </label>
+        </div>
+
+        <p id="accountEntryError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>Cancelar</button>
+          <button class="primary-button" type="submit">Salvar Lancamento</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="accountBulkDialog" class="modal wide-modal">
+      <form id="accountBulkForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Conta PJ</p>
+            <h2>Cadastrar Varios Lancamentos</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-close-dialog aria-label="Fechar">x</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Data
+            <input id="accountBulkDate" type="date" required />
+          </label>
+          <label>
+            Tipo
+            <select id="accountBulkType" required>
+              <option value="Entrada">Entrada</option>
+              <option value="Saida">Saida</option>
+            </select>
+          </label>
+          <label class="span-2">
+            Descricao
+            <input id="accountBulkDescription" required maxlength="180" placeholder="Ex: Compra parcelada, taxas, recebimento" />
+          </label>
+          <label>
+            Forma de pagamento
+            <select id="accountBulkPayment" required>
+              <option value="Pix">Pix</option>
+              <option value="Boleto">Boleto</option>
+              <option value="Transferencia">Transferencia</option>
+            </select>
+          </label>
+          <label>
+            No. nota fiscal
+            <input id="accountBulkInvoiceNumber" maxlength="80" />
+          </label>
+          <label>
+            Data da nota fiscal
+            <input id="accountBulkInvoiceDate" type="date" />
+          </label>
+          <label>
+            Parcelas
+            <input id="accountBulkInstallments" maxlength="40" placeholder="Ex: 1/3 ou 3x" />
+          </label>
+          <label class="span-2">
+            Observacoes
+            <textarea id="accountBulkNotes" rows="3" maxlength="500"></textarea>
+          </label>
+        </div>
+
+        <div class="batch-section">
+          <div class="section-heading">
+            <div>
+              <h3>Valores</h3>
+              <p>Cada valor sera salvo como um lancamento separado usando os dados acima.</p>
+            </div>
+            <button id="addAccountBulkRow" class="secondary-button" type="button">Adicionar linha</button>
+          </div>
+          <div id="accountBulkRows" class="account-bulk-rows"></div>
+        </div>
+
+        <p id="accountBulkError" class="form-error" role="alert"></p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog>Cancelar</button>
+          <button class="primary-button" type="submit">Salvar Lancamentos</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="detailsDialog" class="modal details-modal">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Detalhes</p>
+          <h2 id="detailsTitle">Produto</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-dialog aria-label="Fechar">x</button>
+      </div>
+      <div id="detailsContent" class="details-content"></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js?v=32"></script>
+  </body>
+</html>
