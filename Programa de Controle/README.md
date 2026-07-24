@@ -132,3 +132,11 @@ Confira se o GitHub recebeu estes arquivos na raiz do repositorio:
 - `styles.css`
 
 O arquivo `railway.json` esta configurado para usar `DOCKERFILE`, que evita depender da deteccao automatica da Railway.
+
+Na tela da Railway, se o log continuar mostrando `railpack process exited with an error`, confira tambem:
+
+- O deploy esta usando o commit mais recente do GitHub.
+- O `Dockerfile` aparece na raiz do repositorio, com D maiusculo.
+- Em `Settings > Build`, o builder esta como Dockerfile.
+- Se existir a opcao de caminho do Dockerfile, informe `Dockerfile`.
+- Como alternativa, em `Variables`, adicione `RAILWAY_DOCKERFILE_PATH=Dockerfile`.
