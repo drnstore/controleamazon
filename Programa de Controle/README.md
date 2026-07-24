@@ -20,7 +20,7 @@ Aplicacao web para gestao de estoque, envios para Amazon, compras, DRE, caixa e 
 - Auditoria de acoes importantes no banco.
 - Exclusao logica para registros principais, preservando historico.
 - Scripts de migracao, criacao de tabelas, seed de administrador e migracao do SQLite antigo.
-- Arquivos de deploy: `requirements.txt`, `railway.json`, `Procfile` e `.env.example`.
+- Arquivos de deploy: `Dockerfile`, `.dockerignore`, `requirements.txt`, `railway.json`, `Procfile` e `.env.example`.
 
 ## Perfis de usuario
 
@@ -117,3 +117,18 @@ python -m py_compile server.py migrate.py migrate_data.py seed_admin.py
 - O sistema nao usa armazenamento local para imagens, entao elas continuam disponiveis online junto com os registros do banco.
 - O arquivo SQLite local continua sendo util para testes locais, mas a versao online deve usar PostgreSQL.
 - A rota `/health` retorna o status do app e do banco para a Railway monitorar.
+
+## Se o deploy falhar no Build image
+
+Confira se o GitHub recebeu estes arquivos na raiz do repositorio:
+
+- `Dockerfile`
+- `.dockerignore`
+- `railway.json`
+- `requirements.txt`
+- `server.py`
+- `index.html`
+- `app.js`
+- `styles.css`
+
+O arquivo `railway.json` esta configurado para usar `DOCKERFILE`, que evita depender da deteccao automatica da Railway.
