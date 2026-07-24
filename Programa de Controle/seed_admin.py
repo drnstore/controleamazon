@@ -17,7 +17,17 @@ def main():
     with db() as connection:
         existing = fetchone(connection, "SELECT id FROM users WHERE email = ?", (email,))
         if existing:
-            print("Administrador ja existe. Nenhuma alteracao feita.")
+            execute(
+                connection,
+                """
+                UPDATE users
+                SET name = ?, role = ?, password_hash = ?, active = ?, updated_at = ?
+                WHERE email = ?
+                """,
+                (name, "admin", hash_password(password), active_value(True), now_ms(), email),
+            )
+            connection.commit()
+            print(f"Administrador atualizado: {email}")
             return
 
         user = {
