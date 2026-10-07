@@ -73,7 +73,6 @@ const dom = {
   emptyState: document.getElementById("emptyState"),
   navTabs: document.querySelector(".nav-tabs"),
   searchInput: document.getElementById("searchInput"),
-  statusFilter: document.getElementById("statusFilter"),
   productDialog: document.getElementById("productDialog"),
   productForm: document.getElementById("productForm"),
   productDialogTitle: document.getElementById("productDialogTitle"),
@@ -233,10 +232,10 @@ const dom = {
   detailsDialog: document.getElementById("detailsDialog"),
   detailsTitle: document.getElementById("detailsTitle"),
   detailsContent: document.getElementById("detailsContent"),
-  metricProducts: document.getElementById("metricProducts"),
+  metricWarehouse: document.getElementById("metricWarehouse"),
   metricValue: document.getElementById("metricValue"),
-  metricSend: document.getElementById("metricSend"),
-  metricBuy: document.getElementById("metricBuy"),
+  metricFba: document.getElementById("metricFba"),
+  metricTotal: document.getElementById("metricTotal"),
   toast: document.getElementById("toast"),
 };
 
@@ -561,7 +560,6 @@ function bindEvents() {
   dom.importFile.addEventListener("change", handleImportFile);
   dom.downloadTemplate.addEventListener("click", downloadTemplateCsv);
   dom.searchInput.addEventListener("input", renderInventory);
-  dom.statusFilter.addEventListener("change", renderInventory);
   dom.openShipmentModal.addEventListener("click", () => openShipmentModal());
   dom.addShipmentItem.addEventListener("click", () => addShipmentProductRow());
   dom.shipmentForm.addEventListener("submit", saveShipment);
@@ -859,13 +857,11 @@ function countBy(items, keyFn) {
 
 function renderInventory() {
   const query = normalize(dom.searchInput.value);
-  const status = dom.statusFilter.value;
   const rows = products
     .map((product) => ({ product, calc: calculateProduct(product) }))
-    .filter(({ product, calc }) => {
+    .filter(({ product }) => {
       const matchesQuery = [product.name, product.asin, product.sku].some((value) => normalize(value).includes(query));
-      const matchesStatus = status === "all" || calc.status.key === status;
-      return matchesQuery && matchesStatus;
+      return matchesQuery;
     });
 
   dom.body.innerHTML = rows.map(({ product, calc }) => productRow(product, calc)).join("");
@@ -887,12 +883,8 @@ function productRow(product, calc) {
       <td class="numeric">${number.format(calc.warehouse)}</td>
       <td class="numeric">${number.format(calc.fba)}</td>
       <td class="numeric">${number.format(calc.total)}</td>
-      <td class="numeric">${number.format(calc.sales)}</td>
-      <td class="numeric">${number.format(calc.sendSuggestion)}</td>
-      <td class="numeric">${number.format(calc.purchaseNeed)}</td>
       <td class="numeric">${currency.format(calc.averageCost)}</td>
       <td class="numeric">${currency.format(calc.stockValue)}</td>
-      <td><span class="status-pill status-${calc.status.key}">${calc.status.label}</span></td>
       <td>
         <div class="actions" data-id="${product.id}">
           <button class="action-toggle" type="button" data-action="toggle-actions">Acoes</button>
@@ -926,10 +918,13 @@ function getInitials(name) {
 function renderMetrics() {
   const totals = calculateInventoryTotals();
 
-  dom.metricProducts.textContent = number.format(products.length);
+  const quantities = products.map(calculateProduct);
+  const warehouse = quantities.reduce((sum, item) => sum + item.warehouse, 0);
+  const fba = quantities.reduce((sum, item) => sum + item.fba, 0);
+  dom.metricWarehouse.textContent = number.format(warehouse);
   dom.metricValue.textContent = currency.format(totals.stockValue);
-  dom.metricSend.textContent = number.format(totals.send);
-  dom.metricBuy.textContent = number.format(totals.buy);
+  dom.metricFba.textContent = number.format(fba);
+  dom.metricTotal.textContent = number.format(warehouse + fba);
 }
 
 function renderShipments() {
@@ -3629,18 +3624,18 @@ function openDetails(product) {
         <div class="details-item"><span>SKU</span><strong>${escapeHtml(product.sku)}</strong></div>
         <div class="details-item"><span>Estoque total</span><strong>${number.format(calc.total)}</strong></div>
         <div class="details-item"><span>Valor em estoque</span><strong>${currency.format(calc.stockValue)}</strong></div>
-        <div class="details-item"><span>Meta FBA</span><strong>${number.format(calc.sales * 2)}</strong></div>
-        <div class="details-item"><span>Enviar para Amazon</span><strong>${number.format(calc.sendSuggestion)}</strong></div>
-        <div class="details-item"><span>Meta estoque total</span><strong>${number.format(calc.sales * 2.5)}</strong></div>
-        <div class="details-item"><span>Comprar</span><strong>${number.format(calc.purchaseNeed)}</strong></div>
+        <div class="details-item"><span>Quantidade no galpao</span><strong>${number.format(calc.warehouse)}</strong></div>
+        <div class="details-item"><span>Quantidade no FBA</span><strong>${number.format(calc.fba)}</strong></div>
+        <div class="details-item"><span>Custo unitario medio</span><strong>${currency.format(calc.averageCost)}</strong></div>
       </div>
     </div>
     <div>
       <h3>Lotes</h3>
+      <p>O custo unitario medio considera os lotes restantes. Cada lote mantem seu proprio custo abaixo.</p>
       <table class="mini-table">
         <thead><tr><th>Data</th><th class="numeric">Quantidade restante</th><th class="numeric">Custo unitario</th><th class="numeric">Valor</th></tr></thead>
         <tbody>
-          ${(product.batches || [])
+          ${[...(product.batches || [])]
             .sort((a, b) => a.receivedAt - b.receivedAt)
             .map(
               (batch) => `
