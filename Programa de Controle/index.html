@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Controle Amazon - Estoque</title>
-    <link rel="stylesheet" href="styles.css?v=32" />
+    <link rel="stylesheet" href="styles.css?v=33" />
   </head>
   <body>
     <aside class="sidebar" aria-label="Navegacao principal">
@@ -124,20 +124,20 @@
 
         <section class="metrics" aria-label="Resumo do estoque">
           <div class="metric">
-            <span>Produtos</span>
-            <strong id="metricProducts">0</strong>
+            <span>Quantidade no galpao</span>
+            <strong id="metricWarehouse">0</strong>
+          </div>
+          <div class="metric">
+            <span>Quantidade no FBA</span>
+            <strong id="metricFba">0</strong>
+          </div>
+          <div class="metric">
+            <span>Estoque total</span>
+            <strong id="metricTotal">0</strong>
           </div>
           <div class="metric">
             <span>Valor em estoque</span>
             <strong id="metricValue">R$ 0,00</strong>
-          </div>
-          <div class="metric">
-            <span>A enviar</span>
-            <strong id="metricSend">0</strong>
-          </div>
-          <div class="metric">
-            <span>A comprar</span>
-            <strong id="metricBuy">0</strong>
           </div>
         </section>
 
@@ -146,20 +146,10 @@
             <span>Buscar</span>
             <input id="searchInput" type="search" placeholder="Nome, ASIN ou SKU" autocomplete="off" />
           </label>
-          <label class="select-field">
-            <span>Status</span>
-            <select id="statusFilter">
-              <option value="all">Todos</option>
-              <option value="adequado">Estoque adequado</option>
-              <option value="enviar">Enviar para Amazon</option>
-              <option value="comprar">Comprar</option>
-              <option value="sem-vendas">Sem vendas recentes</option>
-            </select>
-          </label>
         </section>
 
         <section class="table-wrap" aria-label="Tabela de estoque">
-          <table>
+          <table class="inventory-table">
             <thead>
               <tr>
                 <th>ASIN</th>
@@ -168,12 +158,8 @@
                 <th>Estoque no galpao</th>
                 <th>Estoque no FBA Amazon</th>
                 <th>Estoque total</th>
-                <th>Vendas dos ultimos 15 dias</th>
-                <th>Quantidade sugerida para enviar a Amazon</th>
-                <th>Necessidade de compra</th>
-                <th>Custo medio unitario</th>
+                <th>Custo unitario medio</th>
                 <th>Valor total em estoque</th>
-                <th>Status</th>
                 <th>Acoes</th>
               </tr>
             </thead>
@@ -579,10 +565,7 @@
             Quantidade no FBA
             <input id="fbaStock" type="number" min="0" step="1" required />
           </label>
-          <label>
-            Vendas dos ultimos 15 dias
-            <input id="last15Sales" type="number" min="0" step="1" required />
-          </label>
+          <input id="last15Sales" type="hidden" value="0" />
         </div>
 
         <div class="batch-section">
@@ -1017,6 +1000,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=32"></script>
+    <script src="app.js?v=33"></script>
   </body>
 </html>
