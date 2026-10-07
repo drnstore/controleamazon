@@ -1220,3 +1220,8 @@ th.numeric {
     font-size: 1.55rem;
   }
 }
+
+/* Estoque: identificacao, saldos e custos por produto. */
+.inventory-table {
+  min-width: 1080px;
+}
