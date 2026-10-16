@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Controle Amazon - Estoque</title>
-    <link rel="stylesheet" href="styles.css?v=33" />
+    <link rel="stylesheet" href="styles.css?v=34" />
   </head>
   <body>
     <aside class="sidebar" aria-label="Navegacao principal">
@@ -800,6 +800,10 @@
             <input id="dreRevenue" type="number" min="0" step="0.01" required />
           </label>
         </div>
+        <div class="section-heading">
+          <button id="openAmazonImport" class="secondary-button" type="button">Importar CSV Amazon</button>
+          <p>Selecione o mês e importe para preencher as entradas e saídas abaixo.</p>
+        </div>
 
         <div class="dre-editor">
           <section class="batch-section">
@@ -1000,6 +1004,19 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=33"></script>
+    <dialog id="amazonImportDialog" class="modal wide-modal" aria-labelledby="amazonImportTitle">
+      <div class="modal-header"><h2 id="amazonImportTitle">Prévia da Importação Amazon</h2><button type="button" id="closeAmazonImport" class="icon-button" aria-label="Fechar">x</button></div>
+      <p>Selecione o relatório mensal. Nada será gravado antes da confirmação.</p>
+      <div class="form-grid">
+        <label>Relatório Unificado de Transações<input id="amazonCsvFile" type="file" accept=".csv,text/csv" /></label>
+        <label>Mês financeiro (Brasília)<input id="amazonImportMonth" type="month" /></label>
+      </div>
+      <button type="button" id="previewAmazonImport" class="secondary-button">Gerar prévia</button>
+      <p id="amazonImportError" class="form-error" role="alert"></p>
+      <div id="amazonImportPreview" aria-live="polite"></div>
+      <div class="modal-actions"><button type="button" id="cancelAmazonImport" class="ghost-button">Cancelar</button><button type="button" id="confirmAmazonImport" class="primary-button" hidden>Confirmar Importação</button></div>
+    </dialog>
+    <script src="amazon-dre.js?v=1"></script>
+    <script src="app.js?v=34"></script>
   </body>
 </html>
