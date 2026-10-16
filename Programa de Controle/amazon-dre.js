@@ -87,10 +87,17 @@ function amazonReportHtml(report, costs = {}) {
 }
 
 function openAmazonImport(month = "", imported = null) {
+  if (imported && !dom.dreDialog.open) {
+    dom.detailsTitle.textContent = `Importação Amazon — ${formatMonth(month)}`;
+    dom.detailsContent.innerHTML = amazonReportHtml(imported);
+    dom.detailsDialog.showModal();
+    return;
+  }
   const dialog = document.getElementById("amazonImportDialog");
   amazonPending = null;
   document.getElementById("amazonCsvFile").value = "";
   document.getElementById("amazonImportMonth").value = month;
+  document.getElementById("amazonImportMonth").readOnly = Boolean(month);
   document.getElementById("amazonImportError").textContent = "";
   document.getElementById("amazonImportPreview").innerHTML = imported ? amazonReportHtml(imported) : "";
   document.getElementById("confirmAmazonImport").hidden = true;
@@ -120,6 +127,9 @@ async function previewAmazonImport() {
     catch { content = new TextDecoder("windows-1252").decode(bytes); }
     const request = { content, file: file.name, month: document.getElementById("amazonImportMonth").value };
     const preview = await apiRequest("/api/dre/amazon/preview", { method: "POST", body: request });
+    if (document.getElementById("amazonCsvFile").files[0] !== file || document.getElementById("amazonImportMonth").value !== request.month) {
+      throw new Error("A seleção mudou. Gere uma nova prévia do arquivo selecionado.");
+    }
     document.getElementById("amazonImportMonth").value = preview.report.month;
     amazonPending = { request: { ...request, month: preview.report.month }, preview };
     document.getElementById("amazonImportPreview").innerHTML = `${preview.revision ? `<p><strong>Já existem dados Amazon importados para ${escapeHtml(formatMonth(preview.report.month))}.</strong> A reimportação cria uma nova revisão, sem duplicar valores.</p>` : ""}
@@ -183,4 +193,3 @@ document.getElementById("previewAmazonImport").addEventListener("click", preview
 document.getElementById("confirmAmazonImport").addEventListener("click", confirmAmazonImport);
 for (const id of ["closeAmazonImport", "cancelAmazonImport"]) document.getElementById(id).addEventListener("click", () => document.getElementById("amazonImportDialog").close());
 for (const id of ["amazonCsvFile", "amazonImportMonth"]) document.getElementById(id).addEventListener("change", invalidateAmazonPreview);
-  
