@@ -491,6 +491,7 @@ async function refreshData() {
     shipments = (data.shipments || []).sort(compareShipments);
     purchases = (data.purchases || []).sort(comparePurchases);
     dreRecords = (data.dreRecords || []).sort(compareDreRecords);
+    amazonDreImports = data.amazonImports || [];
     cashState = normalizeCashState(data.cashState);
     accountEntries = (data.accountEntries || []).sort(compareAccountEntries);
     accountMonths = (data.accountMonths || []).sort(compareAccountMonths);
@@ -506,6 +507,7 @@ async function refreshData() {
     );
   } else {
     products = (await getAll(PRODUCT_STORE)).sort((a, b) => a.name.localeCompare(b.name));
+    amazonDreImports = [];
     movements = (await getAll(MOVEMENT_STORE)).sort((a, b) => b.createdAt - a.createdAt);
     shipments = (await getAll(SHIPMENT_STORE)).sort(compareShipments);
     purchases = (await getAll(PURCHASE_STORE)).sort(comparePurchases);
@@ -773,7 +775,7 @@ function renderDashboard() {
   const nextShipmentQty = nextShipment
     ? nextShipment.items.reduce((sum, item) => sum + toInt(item.quantity), 0)
     : 0;
-  const latestDre = dreRecords[0];
+  const latestDre = amazonDreRecords().sort(compareDreRecords)[0];
   const latestDreCalc = latestDre ? calculateDre(latestDre) : null;
 
   dom.dashboardCashTotal.textContent = dashboardMoney(currency.format(cashTotal));
@@ -807,7 +809,7 @@ function renderDashboard() {
   dom.dashboardDreList.innerHTML = latestDre
     ? [
         dashboardLine("Mes", formatMonth(latestDre.month)),
-        dashboardLine("Faturamento", dashboardMoney(currency.format(latestDre.revenue || 0)), "", true),
+        dashboardLine("Faturamento", dashboardMoney(currency.format(amazonEffective(latestDre).revenue || 0)), "", true),
         dashboardLine("Lucro liquido", dashboardMoney(currency.format(latestDreCalc.netProfit)), latestDreCalc.netProfit < 0 ? "danger" : "success", true),
         dashboardLine("Margem", formatPercent(latestDreCalc.margin)),
       ].join("")
@@ -1222,9 +1224,9 @@ function openShipmentDetails(shipment) {
 }
 
 function renderDre() {
-  const orderedRecords = dreRecords.slice().sort(compareDreRecords);
+  const orderedRecords = amazonDreRecords().sort(compareDreRecords);
   dom.dreBody.innerHTML = orderedRecords.map((record) => dreRow(record)).join("");
-  dom.emptyDreState.hidden = dreRecords.length > 0;
+  dom.emptyDreState.hidden = orderedRecords.length > 0;
   renderDreMetrics();
 }
 
@@ -1232,8 +1234,8 @@ function dreRow(record) {
   const calc = calculateDre(record);
   return `
     <tr>
-      <td><span class="dre-month">${escapeHtml(formatMonth(record.month))}</span></td>
-      <td class="numeric">${currency.format(record.revenue || 0)}</td>
+      <td><span class="dre-month">${escapeHtml(formatMonth(record.month))}</span>${amazonFor(record) ? '<small>✓ Amazon importado</small>' : ''}</td>
+      <td class="numeric">${currency.format(amazonEffective(record).revenue || 0)}</td>
       <td class="numeric">${currency.format(calc.incomeTotal)}</td>
       <td class="numeric">${currency.format(calc.expenseTotal)}</td>
       <td class="numeric"><strong class="${calc.netProfit < 0 ? "negative-value" : "positive-value"}">${currency.format(calc.netProfit)}</strong></td>
@@ -1244,6 +1246,7 @@ function dreRow(record) {
           <div class="action-menu">
             <button type="button" data-dre-action="edit">Editar fechamento</button>
             <button type="button" data-dre-action="details">Ver detalhes</button>
+            ${amazonFor(record) ? '<button type="button" data-dre-action="amazon">Ver detalhes da importação</button>' : ''}
             <button type="button" data-dre-action="delete" class="danger-text">Excluir fechamento</button>
           </div>
         </div>
@@ -1254,11 +1257,11 @@ function dreRow(record) {
 
 function renderDreMetrics() {
   const year = currentYearKey();
-  const annualRecords = dreRecords.filter((record) => String(record.monthKey || record.month || "").startsWith(`${year}-`));
+  const annualRecords = amazonDreRecords().filter((record) => String(record.monthKey || record.month || "").startsWith(`${year}-`));
   const annual = annualRecords.reduce(
     (totals, record) => {
       const calc = calculateDre(record);
-      totals.revenue += record.revenue || 0;
+      totals.revenue += amazonEffective(record).revenue || 0;
       totals.income += calc.incomeTotal;
       totals.expense += calc.expenseTotal;
       totals.netProfit += calc.netProfit;
@@ -1281,10 +1284,19 @@ function openDreModal(record = null) {
   dom.dreExpenseRows.innerHTML = "";
   dom.dreRecordId.value = record?.id || "";
   dom.dreDialogTitle.textContent = record ? "Editar Mes" : "Cadastrar Mes";
+  dom.dreMonth.disabled = Boolean(amazonFor(record));
+  dom.dreRevenue.readOnly = Boolean(amazonFor(record));
+  document.getElementById("amazonEditorNotice")?.remove();
+  if (amazonFor(record)) {
+    const notice = document.createElement("p");
+    notice.id = "amazonEditorNotice";
+    notice.textContent = "✓ Amazon importado. As linhas identificadas como Amazon são preenchidas pelo CSV. Continue preenchendo os demais gastos abaixo. O custo dos produtos (CMV) continua manual. Os lançamentos originais ficam preservados nos detalhes.";
+    dom.dreForm.prepend(notice);
+  }
 
   if (record) {
     dom.dreMonth.value = record.month;
-    dom.dreRevenue.value = record.revenue || 0;
+    dom.dreRevenue.value = amazonEffective(record).revenue || 0;
     (record.incomes || []).forEach((line) => addDreLine("income", line));
     (record.expenses || []).forEach((line) => addDreLine("expense", line));
   } else {
@@ -1292,6 +1304,18 @@ function openDreModal(record = null) {
     dom.dreRevenue.value = 0;
     DEFAULT_DRE_INCOMES.forEach((label) => addDreLine("income", { label, value: 0 }));
     DEFAULT_DRE_EXPENSES.forEach((label) => addDreLine("expense", { label, value: 0 }));
+  }
+
+  const imported = amazonFor(record);
+  if (imported) {
+    imported.lines.forEach((line) => addAmazonDreLine(line));
+    for (const [container, field] of [[dom.dreIncomeRows, "incomes"], [dom.dreExpenseRows, "expenses"]]) {
+      container.querySelectorAll(".dre-line-row:not([data-amazon-source])").forEach((row) => {
+        if (imported.excludedManual.includes(`${field}:${row.dataset.lineId}`)) {
+          row.hidden = true;
+        }
+      });
+    }
   }
 
   updateDrePreview();
@@ -1324,8 +1348,11 @@ function addDreLine(type, line = null) {
 }
 
 function readDreLines(container) {
-  return [...container.querySelectorAll(".dre-line-row")]
+  const existing = dreRecords.find((record) => record.id === dom.dreRecordId.value);
+  const originals = container === dom.dreIncomeRows ? existing?.incomes : existing?.expenses;
+  return [...container.querySelectorAll(".dre-line-row:not([data-amazon-source])")]
     .map((row) => ({
+      ...(originals || []).find((line) => line.id === row.dataset.lineId),
       id: row.dataset.lineId || uid(),
       label: row.querySelector(".dre-line-label").value.trim(),
       value: toMoneyNumber(row.querySelector(".dre-line-value").value),
@@ -1339,10 +1366,11 @@ function buildDreFromForm() {
   const month = dom.dreMonth.value;
 
   return {
+    ...existing,
     id,
     month,
     monthKey: month,
-    revenue: toMoneyNumber(dom.dreRevenue.value),
+    revenue: amazonFor({month}) ? (existing?.revenue || 0) : toMoneyNumber(dom.dreRevenue.value),
     incomes: readDreLines(dom.dreIncomeRows),
     expenses: readDreLines(dom.dreExpenseRows),
     createdAt: existing?.createdAt || Date.now(),
@@ -1399,7 +1427,7 @@ function handleDreTableClick(event) {
 
   const action = actionButton.dataset.dreAction;
   const wrapper = actionButton.closest(".actions");
-  const record = dreRecords.find((item) => item.id === wrapper?.dataset.dreId);
+  const record = amazonDreRecords().find((item) => item.id === wrapper?.dataset.dreId);
   if (!record) return;
 
   if (action === "toggle-actions") {
@@ -1413,10 +1441,15 @@ function handleDreTableClick(event) {
   wrapper.classList.remove("open");
   if (action === "edit") openDreModal(record);
   if (action === "details") openDreDetails(record);
+  if (action === "amazon") openAmazonImport(record.month, amazonFor(record));
   if (action === "delete") deleteDreRecord(record);
 }
 
 async function deleteDreRecord(record) {
+  if (amazonFor(record)) {
+    showToast("Este mês tem importação Amazon preservada. Edite os lançamentos manuais ou reimporte o CSV.");
+    return;
+  }
   if (!confirm(`Excluir a DRE de ${formatMonth(record.month)}?`)) return;
 
   if (backendEnabled) {
@@ -1433,6 +1466,7 @@ async function deleteDreRecord(record) {
 
 function updateDrePreview() {
   const record = {
+    month: dom.dreMonth.value,
     revenue: toMoneyNumber(dom.dreRevenue.value),
     incomes: readDreLines(dom.dreIncomeRows),
     expenses: readDreLines(dom.dreExpenseRows),
@@ -1445,6 +1479,7 @@ function updateDrePreview() {
 }
 
 function calculateDre(record) {
+  record = amazonEffective(record);
   const incomeTotal = (record.incomes || []).reduce((sum, line) => sum + (line.value || 0), 0);
   const expenseTotal = (record.expenses || []).reduce((sum, line) => sum + (line.value || 0), 0);
   const netProfit = incomeTotal - expenseTotal;
@@ -1454,6 +1489,8 @@ function calculateDre(record) {
 
 function openDreDetails(record) {
   const calc = calculateDre(record);
+  const imported = amazonFor(record);
+  record = amazonEffective(record);
   dom.detailsTitle.textContent = `DRE ${formatMonth(record.month)}`;
   dom.detailsContent.innerHTML = `
     <div class="details-grid">
@@ -1467,6 +1504,7 @@ function openDreDetails(record) {
       ${dreDetailsTable("Entradas", record.incomes || [])}
       ${dreDetailsTable("Saidas", record.expenses || [])}
     </div>
+    ${imported ? amazonReportHtml(imported) : ""}
   `;
   dom.detailsDialog.showModal();
 }
