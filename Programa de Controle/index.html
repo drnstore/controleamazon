@@ -4,29 +4,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Controle Amazon - Estoque</title>
-    <link rel="stylesheet" href="styles.css?v=34" />
+    <link rel="stylesheet" href="styles.css?v=35" />
   </head>
   <body>
     <aside class="sidebar" aria-label="Navegacao principal">
       <div class="brand">
-        <span class="brand-mark">A</span>
+        <svg class="drn-logo" viewBox="0 0 733.227 259.172" role="img" aria-label="DRN"><g transform="translate(-55.3825 428.5328) scale(1 -1)" fill="currentColor"><path transform="translate(733.599 428.5328)" d="M0 0H55.01V-257.754L-128.971-128.968 -129.155-239.355 -184.165-257.754V-.365L-.185-128.968Z"/><path transform="translate(541.1322 223.5182)" d="M0 0L-153.384 63.351H-.496V204.834H-239.588V149.491L-55.689 149.64V120.018H-239.588V44.3L0-54.157Z"/><path transform="translate(294.7415 428.3522)" d="M0 0H-238.99L-239.098-75.387H-183.98V-55.194H-55.194L-55.01-118.85 -183.98-164.485V-146.014H-239.199L-239.359-257.573 0-160.797V-55.369H.006V0Z"/><path fill="#35ac9d" d="M55.6 297.295h55.106v40.715H55.6Z"/></g></svg>
         <div>
           <strong>Controle Amazon</strong>
-          <small>Operacao FBA</small>
+          <small>Operação FBA</small>
         </div>
       </div>
-      <div id="userPanel" class="user-panel" hidden>
-        <span id="currentUserName">Usuario</span>
+      <details id="userPanel" class="user-panel" hidden>
+        <summary><span class="user-avatar" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3Z"/></svg></span><span id="currentUserName">Usuário</span><span aria-hidden="true">⌄</span></summary>
         <button id="logoutButton" type="button">Sair</button>
-      </div>
+      </details>
       <nav class="nav-tabs">
-        <button type="button" class="active" data-tab="dashboard">Dashboard</button>
-        <button type="button" data-tab="inventory">Estoque</button>
-        <button type="button" data-tab="shipments">Envios Amazon</button>
-        <button type="button" data-tab="purchases">Compras</button>
-        <button type="button" data-tab="dre">DRE Mensal</button>
-        <button type="button" data-tab="cash">Caixa</button>
-        <button type="button" data-tab="account">Conta</button>
+        <button type="button" class="active" data-tab="dashboard"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/></svg>Dashboard</button>
+        <button type="button" data-tab="inventory"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8Zm0 19V12M3 8l9 5 9-5M7 5l10 6"/></svg>Estoque</button>
+        <button type="button" data-tab="shipments"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16V5h12v11H3Zm12-7h4l3 4v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>Envios Amazon</button>
+        <button type="button" data-tab="purchases"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h3l3 13h11l3-10H6"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg>Compras</button>
+        <button type="button" data-tab="dre"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7m5 7V8m5 13V3m5 18V10"/></svg>DRE Mensal</button>
+        <button type="button" data-tab="cash"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M3 9V5a2 2 0 0 1 2-2h13v3m3 6h-6v5h6m-4-2.5h.1"/></svg>Caixa</button>
+        <button type="button" data-tab="account"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3Z"/></svg>Conta</button>
       </nav>
     </aside>
 
@@ -34,8 +34,8 @@
       <section id="dashboardView" class="tab-view">
         <header class="page-header">
           <div>
-            <p class="eyebrow">Visao geral</p>
-            <h1>Dashboard</h1>
+            <p class="eyebrow">Visão geral</p>
+            <h1>Dashboard</h1><p class="dashboard-subtitle">Acompanhe os principais indicadores da sua operação FBA.</p>
           </div>
           <button id="toggleDashboardMoney" class="dashboard-eye-button" type="button" aria-label="Ocultar valores em dinheiro" title="Ocultar valores em dinheiro">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -46,62 +46,38 @@
         </header>
 
         <section class="metrics" aria-label="Resumo geral">
-          <div class="metric">
-            <span>Caixa total</span>
-            <strong id="dashboardCashTotal" data-money-value>R$ 0,00</strong>
-          </div>
-          <div class="metric">
-            <span>Valor em estoque</span>
-            <strong id="dashboardStockValue" data-money-value>R$ 0,00</strong>
-          </div>
-          <div class="metric">
-            <span>A enviar Amazon</span>
-            <strong id="dashboardSendQty">0</strong>
-          </div>
-          <div class="metric">
-            <span>A comprar</span>
-            <strong id="dashboardBuyQty">0</strong>
-          </div>
+          <div class="metric dashboard-metric"><div class="icon-tile teal"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M3 9V5a2 2 0 0 1 2-2h13v3m3 6h-6v5h6m-4-2.5h.1"/></svg></div><div class="metric-copy"><span>Caixa total</span>
+            <strong id="dashboardCashTotal" data-money-value>R$ 0,00</strong></div></div>
+          <div class="metric dashboard-metric"><div class="icon-tile orange"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8Zm0 19V12M3 8l9 5 9-5M7 5l10 6"/></svg></div><div class="metric-copy"><span>Valor em estoque</span>
+            <strong id="dashboardStockValue" data-money-value>R$ 0,00</strong></div></div>
+          <div class="metric dashboard-metric"><div class="icon-tile blue"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16V5h12v11H3Zm12-7h4l3 4v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></div><div class="metric-copy"><span>A enviar Amazon</span>
+            <strong id="dashboardSendQty">0</strong></div></div>
+          <div class="metric dashboard-metric"><div class="icon-tile teal"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h3l3 13h11l3-10H6"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg></div><div class="metric-copy"><span>A comprar</span>
+            <strong id="dashboardBuyQty">0</strong></div></div>
         </section>
 
         <section class="dashboard-grid" aria-label="Indicadores principais">
           <div class="dashboard-panel">
-            <div class="section-heading">
-              <div>
-                <h3>Estoque</h3>
-                <p>Alertas calculados pelos produtos cadastrados.</p>
-              </div>
-            </div>
+            <div class="section-heading"><div class="panel-heading"><div class="icon-tile teal"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8Zm0 19V12M3 8l9 5 9-5M7 5l10 6"/></svg></div><div><h3>Estoque</h3>
+                <p>Alertas calculados pelos produtos cadastrados.</p></div></div><button type="button" class="panel-link" onclick="setActiveTab('inventory')">Ver estoque<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></div>
             <div id="dashboardInventoryList" class="dashboard-list"></div>
           </div>
 
           <div class="dashboard-panel">
-            <div class="section-heading">
-              <div>
-                <h3>Compras</h3>
-                <p>Status dos pedidos cadastrados.</p>
-              </div>
-            </div>
+            <div class="section-heading"><div class="panel-heading"><div class="icon-tile orange"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h3l3 13h11l3-10H6"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg></div><div><h3>Compras</h3>
+                <p>Status dos pedidos cadastrados.</p></div></div><button type="button" class="panel-link" onclick="setActiveTab('purchases')">Ver compras<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></div>
             <div id="dashboardPurchasesList" class="dashboard-list"></div>
           </div>
 
           <div class="dashboard-panel">
-            <div class="section-heading">
-              <div>
-                <h3>Envios Amazon</h3>
-                <p>Proximo agendamento e itens previstos.</p>
-              </div>
-            </div>
+            <div class="section-heading"><div class="panel-heading"><div class="icon-tile blue"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16V5h12v11H3Zm12-7h4l3 4v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></div><div><h3>Envios Amazon</h3>
+                <p>Proximo agendamento e itens previstos.</p></div></div><button type="button" class="panel-link" onclick="setActiveTab('shipments')">Ver envios<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></div>
             <div id="dashboardShipmentsList" class="dashboard-list"></div>
           </div>
 
           <div class="dashboard-panel">
-            <div class="section-heading">
-              <div>
-                <h3>DRE</h3>
-                <p>Ultimo fechamento mensal cadastrado.</p>
-              </div>
-            </div>
+            <div class="section-heading"><div class="panel-heading"><div class="icon-tile teal"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7m5 7V8m5 13V3m5 18V10"/></svg></div><div><h3>DRE</h3>
+                <p>Ultimo fechamento mensal cadastrado.</p></div></div><button type="button" class="panel-link" onclick="setActiveTab('dre')">Ver DRE<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></div>
             <div id="dashboardDreList" class="dashboard-list"></div>
           </div>
         </section>
@@ -503,7 +479,7 @@
     </main>
 
     <section id="loginOverlay" class="login-overlay" hidden>
-      <form id="loginForm" class="login-card">
+      <form id="loginForm" class="login-card"><svg class="drn-logo" viewBox="0 0 733.227 259.172" role="img" aria-label="DRN"><g transform="translate(-55.3825 428.5328) scale(1 -1)" fill="currentColor"><path transform="translate(733.599 428.5328)" d="M0 0H55.01V-257.754L-128.971-128.968 -129.155-239.355 -184.165-257.754V-.365L-.185-128.968Z"/><path transform="translate(541.1322 223.5182)" d="M0 0L-153.384 63.351H-.496V204.834H-239.588V149.491L-55.689 149.64V120.018H-239.588V44.3L0-54.157Z"/><path transform="translate(294.7415 428.3522)" d="M0 0H-238.99L-239.098-75.387H-183.98V-55.194H-55.194L-55.01-118.85 -183.98-164.485V-146.014H-239.199L-239.359-257.573 0-160.797V-55.369H.006V0Z"/><path fill="#35ac9d" d="M55.6 297.295h55.106v40.715H55.6Z"/></g></svg>
         <div>
           <p class="eyebrow">Acesso seguro</p>
           <h1>Entrar no sistema</h1>
