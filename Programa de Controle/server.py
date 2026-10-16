@@ -12,6 +12,7 @@ import sqlite3
 import sys
 import time
 import uuid
+from amazon_csv import parse_report
 
 
 ROOT = Path(__file__).resolve().parent
@@ -260,6 +261,9 @@ def migrate_schema(connection):
         ]
     for statement in statements:
         connection.execute(statement)
+    connection.execute("""CREATE TABLE IF NOT EXISTS amazon_dre_imports (
+        month_key TEXT NOT NULL, revision INTEGER NOT NULL, data TEXT NOT NULL,
+        PRIMARY KEY (month_key, revision))""")
     add_missing_columns(connection)
     connection.commit()
 
@@ -651,6 +655,70 @@ def handle_users(handler):
         write_json(handler, 200, {"ok": True, "user": safe_user(new_user)})
 
 
+def amazon_imports(connection):
+    return [load_json_row(row) for row in fetchall(connection, """
+        SELECT a.data FROM amazon_dre_imports a
+        WHERE a.revision = (SELECT MAX(b.revision) FROM amazon_dre_imports b WHERE b.month_key = a.month_key)
+        ORDER BY a.month_key DESC""")]
+
+
+def amazon_preview(connection, payload):
+    report = parse_report(payload.get("content"), payload.get("file", "relatorio.csv"), payload.get("month"))
+    month = report["month"]
+    row = fetchone(connection, "SELECT data, active FROM dre_records WHERE month_key = ?", (month,))
+    existing_dre = load_json_row(row) if row else None
+    if row and not row["active"]:
+        raise ValueError("Existe um fechamento arquivado neste mês. A importação não modifica fechamentos arquivados.")
+    if existing_dre and (existing_dre.get("closed") or existing_dre.get("locked") or existing_dre.get("status") in ["closed", "fechado"]):
+        raise ValueError("Este DRE está fechado. A importação não modifica meses fechados.")
+    latest = fetchone(connection, "SELECT data FROM amazon_dre_imports WHERE month_key = ? ORDER BY revision DESC LIMIT 1", (month,))
+    previous = load_json_row(latest) if latest else None
+    manual = []
+    for field, side in [("incomes", "income"), ("expenses", "expense")]:
+        for index, line in enumerate((existing_dre or {}).get(field, [])):
+            manual.append({**line, "key": f"{field}:{line.get('id', index)}", "side": side})
+    fingerprint = hashlib.sha256(json_text(existing_dre).encode()).hexdigest()
+    revision = previous["revision"] if previous else 0
+    token_data = json_text([report, fingerprint, revision])
+    token = hmac.new(session_secret(), token_data.encode(), hashlib.sha256).hexdigest()
+    # Current weighted costs are reference only; historical/manual CMV remains untouched.
+    costs = {}
+    for product in select_active_json(connection, "products", "id"):
+        quantity = max(0, int(product.get("warehouseStock", 0))) + max(0, int(product.get("fbaStock", 0)))
+        value = sum(float(b.get("remainingQty", 0)) * float(b.get("unitCost", 0)) for b in product.get("batches", []))
+        costs[str(product.get("sku", ""))] = value / quantity if quantity else None
+    return {"report": report, "token": token, "revision": revision, "manual": manual,
+            "previousExclusions": previous.get("excludedManual", []) if previous else [],
+            "existingRevenue": (existing_dre or {}).get("revenue", 0), "costReferences": costs}
+
+
+def confirm_amazon_import(connection, payload, user):
+    month = payload.get("month", "")
+    if is_postgres():
+        execute(connection, "SELECT pg_advisory_xact_lock(hashtext(?))", ("amazon-dre:" + month,))
+        execute(connection, "SELECT id FROM dre_records WHERE month_key = ? FOR UPDATE", (month,))
+    else:
+        execute(connection, "BEGIN IMMEDIATE")
+    preview = amazon_preview(connection, payload)
+    if not hmac.compare_digest(str(payload.get("token", "")), preview["token"]):
+        raise ValueError("Os dados mudaram desde a prévia. Gere uma nova prévia antes de confirmar.")
+    if preview["revision"] and payload.get("reimport") is not True:
+        raise ValueError("Já existem dados Amazon neste mês. Confirme Reimportar dados Amazon.")
+    excluded = payload.get("excludedManual", [])
+    allowed = {line["key"] for line in preview["manual"]}
+    if not isinstance(excluded, list) or any(key not in allowed for key in excluded):
+        raise ValueError("Seleção de lançamentos manuais inválida.")
+    report = preview["report"]
+    if report["month"] != month:
+        raise ValueError("Confirme o mês da prévia.")
+    report.update({"revision": preview["revision"] + 1, "imported_at": now_ms(),
+                   "imported_by": user.get("id"), "excludedManual": sorted(set(excluded)),
+                   "manualSnapshot": preview["manual"], "originalRevenue": preview["existingRevenue"]})
+    execute(connection, "INSERT INTO amazon_dre_imports (month_key, revision, data) VALUES (?, ?, ?)",
+            (month, report["revision"], json_text(report)))
+    return report
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
@@ -690,6 +758,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "shipments": select_active_json(connection, "shipments", "schedule_date, schedule_time"),
                             "purchases": select_active_json(connection, "purchases", "id DESC"),
                             "dreRecords": select_active_json(connection, "dre_records", "month_key DESC"),
+                            "amazonImports": amazon_imports(connection),
                             "cashState": cash_state,
                             "accountEntries": select_active_json(connection, "account_entries", "entry_date DESC, id DESC"),
                             "accountMonths": [load_json_row(row) for row in fetchall(connection, "SELECT data FROM account_months ORDER BY month_key DESC")],
@@ -721,6 +790,19 @@ class Handler(SimpleHTTPRequestHandler):
                 if not user:
                     return
                 payload = read_json(self)
+
+                if path in ["/api/dre/amazon/preview", "/api/dre/amazon/confirm"]:
+                    try:
+                        if path.endswith("/preview"):
+                            result = amazon_preview(connection, payload)
+                        else:
+                            result = confirm_amazon_import(connection, payload, user)
+                            connection.commit()
+                        write_json(self, 200, result)
+                    except ValueError as error:
+                        connection.rollback()
+                        write_json(self, 400, {"error": str(error)})
+                    return
 
                 if path == "/api/bootstrap":
                     if users_count(connection) == 0:
@@ -863,7 +945,7 @@ def post_permission(path):
         return "shipments:write"
     if path == "/api/purchases":
         return "purchases:write"
-    if path == "/api/dre":
+    if path in ["/api/dre", "/api/dre/amazon/preview", "/api/dre/amazon/confirm"]:
         return "dre:write"
     if path == "/api/cash":
         return "cash:write"
