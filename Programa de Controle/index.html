@@ -419,20 +419,29 @@
           <form id="accountOpeningForm">
             <div class="form-grid">
               <label>
-                Saldo no comeco do mes
+                Saldo começo do mês
                 <input id="accountOpeningBalance" type="number" step="0.01" required />
+              </label>
+              <label>
+                Saldo investimentos
+                <input id="accountInvestmentBalance" type="number" step="0.01" value="0" required />
               </label>
             </div>
             <div class="modal-actions">
-              <button class="secondary-button" type="submit">Salvar Saldo Inicial</button>
+              <button class="secondary-button" type="submit">Salvar saldos do mês</button>
             </div>
           </form>
         </section>
 
+        <p class="dashboard-subtitle">Saldo final = saldo começo do mês + saldo investimentos + entradas − saídas.</p>
         <section class="metrics" aria-label="Resumo da conta">
           <div class="metric">
             <span>Saldo inicial</span>
             <strong id="metricAccountOpening">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Saldo investimentos</span>
+            <strong id="metricAccountInvestments">R$ 0,00</strong>
           </div>
           <div class="metric">
             <span>Entradas do mes</span>
@@ -993,6 +1002,6 @@
       <div class="modal-actions"><button type="button" id="cancelAmazonImport" class="ghost-button">Cancelar</button><button type="button" id="confirmAmazonImport" class="primary-button" hidden>Confirmar Importação</button></div>
     </dialog>
     <script src="amazon-dre.js?v=1"></script>
-    <script src="app.js?v=34"></script>
+    <script src="app.js?v=36"></script>
   </body>
 </html>
