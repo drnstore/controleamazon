@@ -182,6 +182,8 @@ const dom = {
   metricCashTotal: document.getElementById("metricCashTotal"),
   accountMonthFilter: document.getElementById("accountMonthFilter"),
   accountOpeningBalance: document.getElementById("accountOpeningBalance"),
+  accountInvestmentBalance: document.getElementById("accountInvestmentBalance"),
+  metricAccountInvestments: document.getElementById("metricAccountInvestments"),
   accountOpeningForm: document.getElementById("accountOpeningForm"),
   exportAccountPdf: document.getElementById("exportAccountPdf"),
   openAccountBulkModal: document.getElementById("openAccountBulkModal"),
@@ -1598,7 +1600,9 @@ function renderAccount() {
   const monthKey = dom.accountMonthFilter.value || currentMonthKey();
   const visibleEntries = filteredAccountEntries();
   const openingBalance = getAccountOpeningBalance(monthKey);
-  const totals = calculateAccountTotals(visibleEntries, openingBalance);
+  const investmentBalance = getAccountInvestmentBalance(monthKey);
+  const totals = calculateAccountTotals(visibleEntries, openingBalance, investmentBalance);
+  dom.metricAccountInvestments.textContent = currency.format(investmentBalance);
 
   dom.metricAccountOpening.textContent = currency.format(openingBalance);
   dom.metricAccountIn.textContent = currency.format(totals.income);
@@ -1609,6 +1613,10 @@ function renderAccount() {
   dom.metricAccountEntries.textContent = number.format(visibleEntries.length);
   if (document.activeElement !== dom.accountOpeningBalance) {
     dom.accountOpeningBalance.value = Number(openingBalance || 0).toFixed(2);
+  }
+
+  if (document.activeElement !== dom.accountInvestmentBalance) {
+    dom.accountInvestmentBalance.value = investmentBalance.toFixed(2);
   }
 
   dom.accountBody.innerHTML = visibleEntries.map((entry) => accountEntryRow(entry)).join("");
@@ -1634,7 +1642,11 @@ function getAccountOpeningBalance(monthKey = dom.accountMonthFilter.value || cur
   return Number(getAccountMonthState(monthKey)?.openingBalance || 0);
 }
 
-function calculateAccountTotals(entries, openingBalance = 0) {
+function getAccountInvestmentBalance(monthKey = dom.accountMonthFilter.value || currentMonthKey()) {
+  return Number(getAccountMonthState(monthKey)?.investmentBalance || 0);
+}
+
+function calculateAccountTotals(entries, openingBalance = 0, investmentBalance = 0) {
   return entries.reduce(
     (totals, entry) => {
       const value = Math.max(0, Number(entry.value || 0));
@@ -1647,7 +1659,7 @@ function calculateAccountTotals(entries, openingBalance = 0) {
       }
       return totals;
     },
-    { income: 0, expense: 0, balance: Number(openingBalance || 0) },
+    { income: 0, expense: 0, balance: Number(openingBalance || 0) + Number(investmentBalance || 0) },
   );
 }
 
@@ -1658,19 +1670,25 @@ async function saveAccountOpeningBalance(event) {
     ensureAccountMonth();
     const monthKey = dom.accountMonthFilter.value || currentMonthKey();
     const openingBalance = toMoneyNumber(dom.accountOpeningBalance.value);
+    const investmentBalance = toMoneyNumber(dom.accountInvestmentBalance.value);
+    if (!Number.isFinite(openingBalance) || !Number.isFinite(investmentBalance)) {
+      throw new Error("Informe valores válidos para os saldos.");
+    }
     const monthState = {
+      ...getAccountMonthState(monthKey),
       monthKey,
       openingBalance,
+      investmentBalance,
       updatedAt: Date.now(),
     };
     await saveAccountMonthState(monthState);
     await refreshData();
     dom.accountMonthFilter.value = monthKey;
     renderAccount();
-    showToast("Saldo inicial salvo.");
+    showToast("Saldos do mês salvos.");
     setActiveTab("account");
   } catch (error) {
-    showToast(error.message || "Nao foi possivel salvar o saldo inicial.");
+    showToast(error.message || "Não foi possível salvar os saldos do mês.");
   }
 }
 
@@ -1968,7 +1986,8 @@ function exportAccountMonthPdf() {
     return String(a.date || "").localeCompare(String(b.date || "")) || (a.createdAt || 0) - (b.createdAt || 0);
   });
   const openingBalance = getAccountOpeningBalance(monthKey);
-  const totals = calculateAccountTotals(entries, openingBalance);
+  const investmentBalance = getAccountInvestmentBalance(monthKey);
+  const totals = calculateAccountTotals(entries, openingBalance, investmentBalance);
 
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
@@ -1976,13 +1995,13 @@ function exportAccountMonthPdf() {
     return;
   }
 
-  printWindow.document.write(buildAccountMonthPdfHtml(monthKey, entries, openingBalance, totals));
+  printWindow.document.write(buildAccountMonthPdfHtml(monthKey, entries, openingBalance, totals, investmentBalance));
   printWindow.document.close();
   printWindow.focus();
   setTimeout(() => printWindow.print(), 450);
 }
 
-function buildAccountMonthPdfHtml(monthKey, entries, openingBalance, totals) {
+function buildAccountMonthPdfHtml(monthKey, entries, openingBalance, totals, investmentBalance = 0) {
   const generatedAt = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
@@ -2032,6 +2051,7 @@ function buildAccountMonthPdfHtml(monthKey, entries, openingBalance, totals) {
         </header>
         <section class="summary">
           <div class="field"><span>Saldo inicial</span><strong>${currency.format(openingBalance)}</strong></div>
+          <div class="field"><span>Saldo investimentos</span><strong>${currency.format(investmentBalance)}</strong></div>
           <div class="field"><span>Entradas</span><strong class="positive">${currency.format(totals.income)}</strong></div>
           <div class="field"><span>Saidas</span><strong class="negative">${currency.format(totals.expense)}</strong></div>
           <div class="field"><span>Saldo final</span><strong>${currency.format(totals.balance)}</strong></div>
