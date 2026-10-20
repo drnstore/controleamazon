@@ -173,6 +173,8 @@ const dom = {
   metricDreProfit: document.getElementById("metricDreProfit"),
   metricDreMargin: document.getElementById("metricDreMargin"),
   cashForm: document.getElementById("cashForm"),
+  cashInvestmentBalance: document.getElementById("cashInvestmentBalance"),
+  metricCashInvestments: document.getElementById("metricCashInvestments"),
   cashAccountValue: document.getElementById("cashAccountValue"),
   cashAmazonReceivable: document.getElementById("cashAmazonReceivable"),
   cashError: document.getElementById("cashError"),
@@ -771,7 +773,7 @@ function renderDashboard() {
   const inventory = calculateInventoryTotals();
   const accountValue = Math.max(0, Number(cashState.accountValue || 0));
   const amazonReceivable = Math.max(0, Number(cashState.amazonReceivable || 0));
-  const cashTotal = inventory.stockValue + accountValue + amazonReceivable;
+  const cashTotal = inventory.stockValue + accountValue + amazonReceivable + Number(cashState.investmentBalance || 0);
   const purchaseStatusCounts = countBy(purchases, (purchase) => purchase.status || "Sem status");
   const nextShipment = shipments.find((shipment) => `${shipment.date} ${shipment.time}` >= currentDateTimeKey());
   const nextShipmentQty = nextShipment
@@ -1538,7 +1540,12 @@ function renderCash() {
   const stockValue = calculateStockTotalValue();
   const accountValue = Math.max(0, Number(cashState.accountValue || 0));
   const amazonReceivable = Math.max(0, Number(cashState.amazonReceivable || 0));
-  const total = stockValue + accountValue + amazonReceivable;
+  const investmentBalance = Math.max(0, Number(cashState.investmentBalance || 0));
+  const total = stockValue + accountValue + amazonReceivable + investmentBalance;
+  dom.metricCashInvestments.textContent = currency.format(investmentBalance);
+  if (document.activeElement !== dom.cashInvestmentBalance) {
+    dom.cashInvestmentBalance.value = investmentBalance.toFixed(2);
+  }
 
   dom.metricCashStock.textContent = currency.format(stockValue);
   dom.metricCashAccount.textContent = currency.format(accountValue);
@@ -1555,6 +1562,8 @@ function renderCash() {
 
 function normalizeCashState(state) {
   return {
+    ...state,
+    investmentBalance: Math.max(0, Number(state?.investmentBalance || 0)),
     id: "main",
     accountValue: Math.max(0, Number(state?.accountValue || 0)),
     amazonReceivable: Math.max(0, Number(state?.amazonReceivable || 0)),
@@ -1568,16 +1577,20 @@ async function saveCashState(event) {
 
   try {
     const updated = {
+      ...cashState,
       id: "main",
+      investmentBalance: toMoneyNumber(dom.cashInvestmentBalance.value),
       accountValue: toMoneyNumber(dom.cashAccountValue.value),
       amazonReceivable: toMoneyNumber(dom.cashAmazonReceivable.value),
       updatedAt: Date.now(),
     };
+    if (!Number.isFinite(updated.investmentBalance) || updated.investmentBalance < 0) throw new Error("Saldo investimentos deve ser um valor válido maior ou igual a zero.");
     if (updated.accountValue < 0) throw new Error("Valor em conta nao pode ser negativo.");
     if (updated.amazonReceivable < 0) throw new Error("Valor a receber da Amazon nao pode ser negativo.");
     await saveCashStateData(updated);
     cashState = normalizeCashState(updated);
     renderCash();
+    renderDashboard();
     showToast("Caixa salvo.");
   } catch (error) {
     dom.cashError.textContent = error.message || "Nao foi possivel salvar o caixa.";
