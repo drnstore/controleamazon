@@ -769,6 +769,12 @@ function getStatus({ sales, sendSuggestion, purchaseNeed }) {
   return { key: "adequado", label: "Estoque adequado" };
 }
 
+function calculateUpcomingShipmentQuantity(records, now = currentDateTimeKey()) {
+  return records.filter((shipment) => shipmentDateTimeKey(shipment) >= now)
+    .reduce((total, shipment) => total + (shipment.items || []).reduce(
+      (sum, item) => sum + Math.max(0, toInt(item.quantity)), 0), 0);
+}
+
 function renderDashboard() {
   const inventory = calculateInventoryTotals();
   const accountValue = Math.max(0, Number(cashState.accountValue || 0));
@@ -784,7 +790,8 @@ function renderDashboard() {
 
   dom.dashboardCashTotal.textContent = dashboardMoney(currency.format(cashTotal));
   dom.dashboardStockValue.textContent = dashboardMoney(currency.format(inventory.stockValue));
-  dom.dashboardSendQty.textContent = number.format(inventory.send);
+  dom.dashboardSendQty.textContent = number.format(calculateUpcomingShipmentQuantity(shipments));
+  dom.dashboardSendQty.title = "Unidades nos próximos envios cadastrados em Envios Amazon";
   dom.dashboardBuyQty.textContent = number.format(inventory.buy);
 
   dom.dashboardInventoryList.innerHTML = [
