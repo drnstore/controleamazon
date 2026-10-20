@@ -363,6 +363,10 @@
             <strong id="metricCashAccount">R$ 0,00</strong>
           </div>
           <div class="metric">
+            <span>Saldo investimentos</span>
+            <strong id="metricCashInvestments">R$ 0,00</strong>
+          </div>
+          <div class="metric">
             <span>A receber Amazon</span>
             <strong id="metricCashAmazon">R$ 0,00</strong>
           </div>
@@ -380,10 +384,15 @@
                 <input id="cashAccountValue" type="number" min="0" step="0.01" required />
               </label>
               <label>
+                Saldo investimentos
+                <input id="cashInvestmentBalance" type="number" min="0" step="0.01" value="0" required />
+              </label>
+              <label>
                 Valor a receber da Amazon
                 <input id="cashAmazonReceivable" type="number" min="0" step="0.01" required />
               </label>
             </div>
+            <p class="dashboard-subtitle">Informe o valor em conta sem incluir os investimentos. O saldo de investimentos do Caixa é independente do saldo informado na aba Conta.</p>
             <p id="cashError" class="form-error" role="alert"></p>
             <div class="modal-actions">
               <button class="primary-button" type="submit">Salvar Caixa</button>
@@ -1002,6 +1011,6 @@
       <div class="modal-actions"><button type="button" id="cancelAmazonImport" class="ghost-button">Cancelar</button><button type="button" id="confirmAmazonImport" class="primary-button" hidden>Confirmar Importação</button></div>
     </dialog>
     <script src="amazon-dre.js?v=1"></script>
-    <script src="app.js?v=36"></script>
+    <script src="app.js?v=37"></script>
   </body>
 </html>
