@@ -582,6 +582,18 @@
       </form>
     </dialog>
 
+    <dialog id="confirmDreDeleteDialog" class="modal details-modal" aria-labelledby="confirmDreDeleteTitle">
+      <div class="modal-header">
+        <div><p class="eyebrow">DRE Mensal</p><h2 id="confirmDreDeleteTitle">Excluir fechamento</h2></div>
+      </div>
+      <p id="confirmDreDeleteText"></p>
+      <p id="confirmDreDeleteError" class="form-error" role="alert"></p>
+      <div class="modal-actions">
+        <button id="cancelDreDelete" class="ghost-button" type="button">Cancelar</button>
+        <button id="confirmDreDelete" class="danger-button" type="button">Excluir fechamento</button>
+      </div>
+    </dialog>
+
     <dialog id="simpleDialog" class="modal small-modal">
       <form id="simpleForm" method="dialog">
         <div class="modal-header">
@@ -797,6 +809,7 @@
         </div>
         <div class="section-heading">
           <button id="openAmazonImport" class="secondary-button" type="button">Importar CSV Amazon</button>
+          <input id="dreCsvFile" type="file" accept=".csv,text/csv" hidden />
           <p>Selecione o mês e importe para preencher as entradas e saídas abaixo.</p>
         </div>
 
@@ -1011,7 +1024,7 @@
       <div id="amazonImportPreview" aria-live="polite"></div>
       <div class="modal-actions"><button type="button" id="cancelAmazonImport" class="ghost-button">Cancelar</button><button type="button" id="confirmAmazonImport" class="primary-button" hidden>Confirmar Importação</button></div>
     </dialog>
-    <script src="amazon-dre.js?v=1"></script>
-    <script src="app.js?v=39"></script>
+    <script src="amazon-dre.js?v=2"></script>
+    <script src="app.js?v=40"></script>
   </body>
 </html>
