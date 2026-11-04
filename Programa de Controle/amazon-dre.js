@@ -3,30 +3,99 @@ let amazonDreImports = [];
 let amazonPending = null;
 let amazonEditorDraft = null;
 
-function addAmazonDreLine(line) {
+function addAmazonDreLine(line, record) {
   const row = document.createElement("div");
   row.className = "dre-line-row";
   row.dataset.amazonSource = "amazon_csv";
-  row.innerHTML = `<label>Descrição<input value="${escapeAttribute(line.label)}" readonly /></label><label>Valor<input value="${amazonMoney(line.cents)}" readonly /></label><span>Amazon CSV</span>`;
+  row.dataset.lineId = line.id;
+  if ((record?.amazonExcludedLines || []).includes(line.id)) return;
+  const edit = record?.amazonLineOverrides?.[line.id] || {};
+  row.innerHTML = `<label>Descrição<input class="dre-line-label" maxlength="100" value="${escapeAttribute(edit.label ?? line.label)}" required /></label>
+    <label>Valor<input class="dre-line-value" type="number" min="0" step="0.01" value="${edit.value ?? line.cents / 100}" required /></label>
+    <button class="danger-button" type="button" data-remove-dre-line>Remover</button>`;
+  row.querySelector("[data-remove-dre-line]").addEventListener("click", () => { row.remove(); updateDrePreview(); });
+  row.querySelectorAll("input").forEach((input) => input.addEventListener("input", updateDrePreview));
   (line.side === "income" ? dom.dreIncomeRows : dom.dreExpenseRows).appendChild(row);
+}
+
+function readAmazonDreAdjustments(report) {
+  if (!report) return { amazonLineOverrides: {}, amazonExcludedLines: [] };
+  const rows = [...document.querySelectorAll(".dre-line-row[data-amazon-source]")];
+  const visible = new Map(rows.map((row) => [row.dataset.lineId, row]));
+  const overrides = {};
+  for (const line of report.lines) {
+    const row = visible.get(line.id);
+    if (!row) continue;
+    const label = row.querySelector(".dre-line-label").value.trim();
+    const value = toMoneyNumber(row.querySelector(".dre-line-value").value);
+    if (label !== line.label || Math.round(value * 100) !== line.cents) {
+      overrides[line.id] = { label, value };
+    }
+  }
+  return {
+    amazonLineOverrides: overrides,
+    amazonExcludedLines: report.lines.filter((line) => !visible.has(line.id)).map((line) => line.id),
+  };
 }
 
 function importAmazonIntoEditor() {
   dom.dreError.textContent = "";
-  const month = dom.dreMonth.value;
-  if (!month) { dom.dreError.textContent = "Selecione o mês antes de importar o CSV."; return; }
-  const existing = dreRecords.find((r) => (r.monthKey || r.month) === month);
+  if (!dom.dreMonth.value) { dom.dreError.textContent = "Selecione o mês antes de importar o CSV."; return; }
+  const existing = dreRecords.find((record) => (record.monthKey || record.month) === dom.dreMonth.value);
   if (existing && existing.id !== dom.dreRecordId.value) {
-    dom.dreError.textContent = "Já existe um DRE para este mês. Abra Editar fechamento para importar mantendo seus lançamentos.";
+    dom.dreError.textContent = "Este mês já existe. Abra Editar fechamento para preencher os campos com o CSV.";
     return;
   }
-  amazonEditorDraft = buildDreFromForm();
-  if (existing && (JSON.stringify(amazonEditorDraft.incomes) !== JSON.stringify(existing.incomes) || JSON.stringify(amazonEditorDraft.expenses) !== JSON.stringify(existing.expenses))) {
-    dom.dreError.textContent = "Salve primeiro as alterações manuais deste fechamento e depois importe o CSV para conferir os valores atualizados.";
-    amazonEditorDraft = null;
-    return;
+  document.getElementById("dreCsvFile").click();
+}
+
+async function populateDreFromAmazonCsv(event) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  const button = document.getElementById("openAmazonImport");
+  const selectedMonth = dom.dreMonth.value;
+  dom.dreError.textContent = "";
+  button.disabled = true;
+  try {
+    if (!backendEnabled) throw new Error("Conecte-se ao servidor para ler o CSV.");
+    if (file.size > 12000000) throw new Error("O CSV deve ter no máximo 12 MB.");
+    const bytes = await file.arrayBuffer();
+    let content;
+    try { content = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+    catch { content = new TextDecoder("windows-1252").decode(bytes); }
+    const preview = await apiRequest("/api/dre/amazon/preview", {
+      method: "POST", body: { content, file: file.name, month: selectedMonth },
+    });
+    if (!dom.dreDialog.open || dom.dreMonth.value !== selectedMonth) {
+      throw new Error("O mês mudou durante a leitura. Selecione o arquivo novamente.");
+    }
+    for (const row of document.querySelectorAll(".dre-line-row[data-csv-filled]")) {
+      if (row.dataset.csvFilled === "added") row.remove();
+      else row.querySelector(".dre-line-value").value = 0;
+      delete row.dataset.csvFilled;
+    }
+    document.querySelectorAll(".dre-line-row[data-amazon-source]").forEach((row) => row.remove());
+    for (const line of preview.report.lines) {
+      const container = line.side === "income" ? dom.dreIncomeRows : dom.dreExpenseRows;
+      const match = [...container.querySelectorAll(".dre-line-row:not([data-amazon-source])")]
+        .find((row) => !row.dataset.csvFilled && row.querySelector(".dre-line-label").value.trim().toLocaleLowerCase("pt-BR") === line.label.toLocaleLowerCase("pt-BR")
+          && toMoneyNumber(row.querySelector(".dre-line-value").value) === 0);
+      if (match) {
+        match.querySelector(".dre-line-value").value = line.cents / 100;
+        match.dataset.csvFilled = "existing";
+      } else {
+        addDreLine(line.side, { id: uid(), label: line.label, value: line.cents / 100 });
+        container.lastElementChild.dataset.csvFilled = "added";
+      }
+    }
+    dom.dreRevenue.value = preview.report.totals.gross / 100;
+    updateDrePreview();
+  } catch (error) {
+    dom.dreError.textContent = error.message || "Não foi possível ler o CSV.";
+  } finally {
+    button.disabled = false;
   }
-  openAmazonImport(month, amazonFor({month}));
 }
 
 function amazonFor(record) {
@@ -48,10 +117,14 @@ function amazonDreRecords() {
 function amazonEffective(record) {
   const imported = amazonFor(record);
   if (!imported || record.amazonEffective) return record;
-  const result = { ...record, amazonEffective: true, revenue: imported.totals.gross / 100 };
+  const result = { ...record, amazonEffective: true,
+    revenue: Number.isFinite(record.amazonRevenueOverride) ? record.amazonRevenueOverride : imported.totals.gross / 100 };
   for (const [field, side] of [["incomes", "income"], ["expenses", "expense"]]) {
     result[field] = (record[field] || []).filter((line, index) => !(imported.excludedManual || []).includes(`${field}:${line.id ?? index}`));
-    result[field] = result[field].concat(imported.lines.filter((line) => line.side === side).map((line) => ({ ...line, value: line.cents / 100 })));
+    result[field] = result[field].concat(imported.lines.filter((line) => line.side === side && !(record.amazonExcludedLines || []).includes(line.id)).map((line) => ({
+      ...line, label: record.amazonLineOverrides?.[line.id]?.label ?? line.label,
+      value: record.amazonLineOverrides?.[line.id]?.value ?? line.cents / 100,
+    })));
   }
   return result;
 }
@@ -189,6 +262,7 @@ async function confirmAmazonImport() {
 }
 
 document.getElementById("openAmazonImport").addEventListener("click", importAmazonIntoEditor);
+document.getElementById("dreCsvFile").addEventListener("change", populateDreFromAmazonCsv);
 document.getElementById("previewAmazonImport").addEventListener("click", previewAmazonImport);
 document.getElementById("confirmAmazonImport").addEventListener("click", confirmAmazonImport);
 for (const id of ["closeAmazonImport", "cancelAmazonImport"]) document.getElementById(id).addEventListener("click", () => document.getElementById("amazonImportDialog").close());
