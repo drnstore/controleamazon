@@ -188,6 +188,7 @@ const dom = {
   metricAccountInvestments: document.getElementById("metricAccountInvestments"),
   accountOpeningForm: document.getElementById("accountOpeningForm"),
   exportAccountPdf: document.getElementById("exportAccountPdf"),
+  exportAccountExcel: document.getElementById("exportAccountExcel"),
   openAccountBulkModal: document.getElementById("openAccountBulkModal"),
   openAccountEntryModal: document.getElementById("openAccountEntryModal"),
   accountBody: document.getElementById("accountBody"),
@@ -594,6 +595,7 @@ function bindEvents() {
   dom.accountMonthFilter.addEventListener("change", renderAccount);
   dom.accountOpeningForm.addEventListener("submit", saveAccountOpeningBalance);
   dom.exportAccountPdf.addEventListener("click", exportAccountMonthPdf);
+  dom.exportAccountExcel.addEventListener("click", exportAccountMonthExcel);
   dom.openAccountBulkModal.addEventListener("click", openAccountBulkModal);
   dom.addAccountBulkRow.addEventListener("click", () => addAccountBulkRow());
   dom.accountBulkForm.addEventListener("submit", saveAccountBulkEntries);
@@ -1997,6 +1999,110 @@ function openAccountEntryDetails(entry) {
     </div>
   `;
   dom.detailsDialog.showModal();
+}
+
+function exportAccountMonthExcel() {
+  ensureAccountMonth();
+  const monthKey = dom.accountMonthFilter.value || currentMonthKey();
+  const entries = filteredAccountEntries().slice().sort((a, b) =>
+    String(a.date || "").localeCompare(String(b.date || "")) || (a.createdAt || 0) - (b.createdAt || 0),
+  );
+  const openingBalance = getAccountOpeningBalance(monthKey);
+  const investmentBalance = getAccountInvestmentBalance(monthKey);
+  const totals = calculateAccountTotals(entries, openingBalance, investmentBalance);
+  const workbook = buildAccountExcelWorkbook(monthKey, entries, openingBalance, investmentBalance, totals);
+  const url = URL.createObjectURL(new Blob([workbook], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `conta-pj-${monthKey}.xlsx`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function buildAccountExcelWorkbook(monthKey, entries, openingBalance, investmentBalance, totals) {
+  const textCell = (value, style = "") => `<c t="inlineStr"${style}><is><t>${escapeExcelXml(value)}</t></is></c>`;
+  const moneyCell = (value) => `<c s="1"><v>${Number(value || 0)}</v></c>`;
+  const row = (cells) => `<row>${cells.join("")}</row>`;
+  const summary = (label, amount) => row([textCell(label), moneyCell(amount)]);
+  const headers = ["Data", "Descrição", "Tipo", "Valor", "Forma de pagamento", "Nº nota fiscal", "Data nota fiscal", "Parcelas", "Observações"];
+  const rows = [
+    row([textCell(`Conta PJ - ${formatMonth(monthKey)}`)]),
+    summary("Saldo começo do mês", openingBalance),
+    summary("Saldo investimentos", investmentBalance),
+    summary("Entradas do mês", totals.income),
+    summary("Saídas do mês", totals.expense),
+    summary("Saldo final do mês", totals.balance),
+    row([]),
+    row(headers.map((header) => textCell(header))),
+    ...entries.map((entry) => row([
+      textCell(formatInputDate(entry.date)),
+      textCell(entry.description),
+      textCell(entry.type),
+      moneyCell(entry.type === "Entrada" ? entry.value : -entry.value),
+      textCell(entry.paymentMethod),
+      textCell(entry.invoiceNumber || ""),
+      textCell(entry.invoiceDate ? formatInputDate(entry.invoiceDate) : ""),
+      textCell(entry.installments || ""),
+      textCell(entry.notes || ""),
+    ])),
+  ];
+  const xml = (body) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>${body}`;
+  const files = [
+    ["[Content_Types].xml", xml(`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`)],
+    ["_rels/.rels", xml(`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`)],
+    ["xl/workbook.xml", xml(`<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Conta PJ" sheetId="1" r:id="rId1"/></sheets></workbook>`)],
+    ["xl/_rels/workbook.xml.rels", xml(`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`)],
+    ["xl/styles.xml", xml(`<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;R$&quot; #,##0.00;[Red](&quot;R$&quot; #,##0.00)"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`)],
+    ["xl/worksheets/sheet1.xml", xml(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="17" customWidth="1"/><col min="2" max="2" width="36" customWidth="1"/><col min="3" max="4" width="17" customWidth="1"/><col min="5" max="5" width="24" customWidth="1"/><col min="6" max="9" width="20" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData></worksheet>`)],
+  ];
+  return zipExcelFiles(files);
+}
+
+function escapeExcelXml(value) {
+  return String(value ?? "").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+}
+
+function zipExcelFiles(files) {
+  const encoder = new TextEncoder();
+  const parts = [];
+  const directory = [];
+  let offset = 0;
+  const u16 = (value) => [value & 255, (value >>> 8) & 255];
+  const u32 = (value) => [...u16(value), ...u16(value >>> 16)];
+  const crc32 = (bytes) => {
+    let crc = -1;
+    for (const byte of bytes) {
+      crc ^= byte;
+      for (let i = 0; i < 8; i += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+    return (crc ^ -1) >>> 0;
+  };
+  for (const [name, content] of files) {
+    const filename = encoder.encode(name);
+    const data = encoder.encode(content);
+    const checksum = crc32(data);
+    const local = new Uint8Array([80, 75, 3, 4, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      ...u32(checksum), ...u32(data.length), ...u32(data.length), ...u16(filename.length), 0, 0]);
+    parts.push(local, filename, data);
+    directory.push(new Uint8Array([80, 75, 1, 2, 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      ...u32(checksum), ...u32(data.length), ...u32(data.length), ...u16(filename.length), 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ...u32(offset)]), filename);
+    offset += local.length + filename.length + data.length;
+  }
+  const directorySize = directory.reduce((total, part) => total + part.length, 0);
+  const end = new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0,
+    ...u16(files.length), ...u16(files.length), ...u32(directorySize), ...u32(offset), 0, 0]);
+  const result = new Uint8Array(offset + directorySize + end.length);
+  let position = 0;
+  for (const part of [...parts, ...directory, end]) {
+    result.set(part, position);
+    position += part.length;
+  }
+  return result;
 }
 
 function exportAccountMonthPdf() {
