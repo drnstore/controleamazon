@@ -656,10 +656,42 @@ def handle_users(handler):
 
 
 def amazon_imports(connection):
-    return [load_json_row(row) for row in fetchall(connection, """
+    reports = [load_json_row(row) for row in fetchall(connection, """
         SELECT a.data FROM amazon_dre_imports a
         WHERE a.revision = (SELECT MAX(b.revision) FROM amazon_dre_imports b WHERE b.month_key = a.month_key)
         ORDER BY a.month_key DESC""")]
+    return [report for report in reports if not report.get("archived")]
+
+
+def archive_amazon_import(connection, month, user):
+    if is_postgres():
+        execute(connection, "SELECT pg_advisory_xact_lock(hashtext(?))", ("amazon-dre:" + month,))
+    row = fetchone(connection, "SELECT data FROM amazon_dre_imports WHERE month_key = ? ORDER BY revision DESC LIMIT 1", (month,))
+    previous = load_json_row(row) if row else None
+    if not previous or previous.get("archived"):
+        return False
+    archived = {**previous, "revision": previous["revision"] + 1,
+                "archived": True, "archived_at": now_ms(), "archived_by": user.get("id")}
+    execute(connection, "INSERT INTO amazon_dre_imports (month_key, revision, data) VALUES (?, ?, ?)",
+            (month, archived["revision"], json_text(archived)))
+    audit(connection, user, "archive", "amazon_dre_imports", month, previous, archived)
+    return True
+
+
+def delete_dre_month(connection, record_id, user):
+    row = fetchone(connection, "SELECT id, month_key, active FROM dre_records WHERE id = ?", (record_id,))
+    synthetic_month = record_id.removeprefix("amazon-") if not row and record_id.startswith("amazon-") else None
+    if not synthetic_month and (not row or not row["active"]):
+        return False
+    month = synthetic_month or row["month_key"]
+    if synthetic_month and (len(month) != 7 or month[4] != "-" or not month[:4].isdigit() or not month[5:].isdigit()):
+        return False
+    archived_import = archive_amazon_import(connection, month, user)
+    if synthetic_month:
+        return archived_import
+    old_data = soft_delete(connection, "dre_records", record_id)
+    audit(connection, user, "delete", "dre_records", record_id, old_data, None)
+    return True
 
 
 def amazon_preview(connection, payload):
@@ -668,7 +700,7 @@ def amazon_preview(connection, payload):
     row = fetchone(connection, "SELECT data, active FROM dre_records WHERE month_key = ?", (month,))
     existing_dre = load_json_row(row) if row else None
     if row and not row["active"]:
-        raise ValueError("Existe um fechamento arquivado neste mês. A importação não modifica fechamentos arquivados.")
+        existing_dre = None
     if existing_dre and (existing_dre.get("closed") or existing_dre.get("locked") or existing_dre.get("status") in ["closed", "fechado"]):
         raise ValueError("Este DRE está fechado. A importação não modifica meses fechados.")
     latest = fetchone(connection, "SELECT data FROM amazon_dre_imports WHERE month_key = ? ORDER BY revision DESC LIMIT 1", (month,))
@@ -688,7 +720,7 @@ def amazon_preview(connection, payload):
         value = sum(float(b.get("remainingQty", 0)) * float(b.get("unitCost", 0)) for b in product.get("batches", []))
         costs[str(product.get("sku", ""))] = value / quantity if quantity else None
     return {"report": report, "token": token, "revision": revision, "manual": manual,
-            "previousExclusions": previous.get("excludedManual", []) if previous else [],
+            "previousExclusions": previous.get("excludedManual", []) if previous and not previous.get("archived") else [],
             "existingRevenue": (existing_dre or {}).get("revenue", 0), "costReferences": costs}
 
 
@@ -878,6 +910,10 @@ class Handler(SimpleHTTPRequestHandler):
                     return
 
                 if path == "/api/dre":
+                    archived = fetchone(connection, "SELECT id FROM dre_records WHERE month_key = ? AND active = ?",
+                                        (payload.get("monthKey", ""), active_value(False)))
+                    if archived and archived["id"] != payload["id"]:
+                        payload["id"] = archived["id"]
                     old_data = get_json_by_id(connection, "dre_records", payload["id"])
                     save_dre(connection, payload)
                     audit(connection, user, "upsert", "dre_records", payload["id"], old_data, payload)
@@ -926,6 +962,13 @@ class Handler(SimpleHTTPRequestHandler):
             with db() as connection:
                 user = require_user(self, connection, permission)
                 if not user:
+                    return
+                if table == "dre_records":
+                    if not delete_dre_month(connection, record_id, user):
+                        write_json(self, 404, {"error": "Fechamento não encontrado."})
+                        return
+                    connection.commit()
+                    write_json(self, 200, {"ok": True})
                     return
                 old_data = soft_delete(connection, table, record_id)
                 audit(connection, user, "delete", table, record_id, old_data, None)
