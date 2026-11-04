@@ -31,6 +31,7 @@ let movements = [];
 let shipments = [];
 let purchases = [];
 let dreRecords = [];
+let pendingDreDeleteId = null;
 let cashState = { id: "main", accountValue: 0, amazonReceivable: 0, updatedAt: 0 };
 let accountEntries = [];
 let accountMonths = [];
@@ -167,6 +168,11 @@ const dom = {
   dreNetProfit: document.getElementById("dreNetProfit"),
   dreMargin: document.getElementById("dreMargin"),
   dreError: document.getElementById("dreError"),
+  confirmDreDeleteDialog: document.getElementById("confirmDreDeleteDialog"),
+  confirmDreDeleteText: document.getElementById("confirmDreDeleteText"),
+  confirmDreDeleteError: document.getElementById("confirmDreDeleteError"),
+  confirmDreDelete: document.getElementById("confirmDreDelete"),
+  cancelDreDelete: document.getElementById("cancelDreDelete"),
   metricDreRevenue: document.getElementById("metricDreRevenue"),
   metricDreIncome: document.getElementById("metricDreIncome"),
   metricDreExpense: document.getElementById("metricDreExpense"),
@@ -591,6 +597,9 @@ function bindEvents() {
   dom.dreExpenseRows.addEventListener("input", updateDrePreview);
   dom.dreRevenue.addEventListener("input", updateDrePreview);
   dom.dreBody.addEventListener("click", handleDreTableClick);
+  dom.confirmDreDelete.addEventListener("click", confirmDeleteDreRecord);
+  dom.cancelDreDelete.addEventListener("click", () => dom.confirmDreDeleteDialog.close());
+  dom.confirmDreDeleteDialog.addEventListener("close", () => { pendingDreDeleteId = null; });
   dom.cashForm.addEventListener("submit", saveCashState);
   dom.accountMonthFilter.addEventListener("change", renderAccount);
   dom.accountOpeningForm.addEventListener("submit", saveAccountOpeningBalance);
@@ -1247,7 +1256,7 @@ function dreRow(record) {
   const calc = calculateDre(record);
   return `
     <tr>
-      <td><span class="dre-month">${escapeHtml(formatMonth(record.month))}</span>${amazonFor(record) ? '<small>✓ Amazon importado</small>' : ''}</td>
+      <td><span class="dre-month">${escapeHtml(formatMonth(record.month))}</span></td>
       <td class="numeric">${currency.format(amazonEffective(record).revenue || 0)}</td>
       <td class="numeric">${currency.format(calc.incomeTotal)}</td>
       <td class="numeric">${currency.format(calc.expenseTotal)}</td>
@@ -1259,7 +1268,6 @@ function dreRow(record) {
           <div class="action-menu">
             <button type="button" data-dre-action="edit">Editar fechamento</button>
             <button type="button" data-dre-action="details">Ver detalhes</button>
-            ${amazonFor(record) ? '<button type="button" data-dre-action="amazon">Ver detalhes da importação</button>' : ''}
             <button type="button" data-dre-action="delete" class="danger-text">Excluir fechamento</button>
           </div>
         </div>
@@ -1298,15 +1306,7 @@ function openDreModal(record = null) {
   dom.dreRecordId.value = record?.id || "";
   dom.dreDialogTitle.textContent = record ? "Editar Mes" : "Cadastrar Mes";
   dom.dreMonth.disabled = Boolean(amazonFor(record));
-  dom.dreRevenue.readOnly = Boolean(amazonFor(record));
-  document.getElementById("amazonEditorNotice")?.remove();
-  if (amazonFor(record)) {
-    const notice = document.createElement("p");
-    notice.id = "amazonEditorNotice";
-    notice.textContent = "✓ Amazon importado. As linhas identificadas como Amazon são preenchidas pelo CSV. Continue preenchendo os demais gastos abaixo. O custo dos produtos (CMV) continua manual. Os lançamentos originais ficam preservados nos detalhes.";
-    dom.dreForm.prepend(notice);
-  }
-
+  dom.dreRevenue.readOnly = false;
   if (record) {
     dom.dreMonth.value = record.month;
     dom.dreRevenue.value = amazonEffective(record).revenue || 0;
@@ -1321,7 +1321,7 @@ function openDreModal(record = null) {
 
   const imported = amazonFor(record);
   if (imported) {
-    imported.lines.forEach((line) => addAmazonDreLine(line));
+    imported.lines.forEach((line) => addAmazonDreLine(line, record));
     for (const [container, field] of [[dom.dreIncomeRows, "incomes"], [dom.dreExpenseRows, "expenses"]]) {
       container.querySelectorAll(".dre-line-row:not([data-amazon-source])").forEach((row) => {
         if (imported.excludedManual.includes(`${field}:${row.dataset.lineId}`)) {
@@ -1377,13 +1377,17 @@ function buildDreFromForm() {
   const id = dom.dreRecordId.value || uid();
   const existing = dreRecords.find((record) => record.id === id);
   const month = dom.dreMonth.value;
+  const imported = amazonFor({ month });
 
   return {
     ...existing,
     id,
     month,
     monthKey: month,
-    revenue: amazonFor({month}) ? (existing?.revenue || 0) : toMoneyNumber(dom.dreRevenue.value),
+    revenue: imported ? (existing?.revenue || 0) : toMoneyNumber(dom.dreRevenue.value),
+    ...(imported ? { amazonRevenueOverride: Math.round(toMoneyNumber(dom.dreRevenue.value) * 100) === imported.totals.gross
+      ? undefined : toMoneyNumber(dom.dreRevenue.value),
+      ...readAmazonDreAdjustments(imported) } : {}),
     incomes: readDreLines(dom.dreIncomeRows),
     expenses: readDreLines(dom.dreExpenseRows),
     createdAt: existing?.createdAt || Date.now(),
@@ -1393,13 +1397,14 @@ function buildDreFromForm() {
 
 function validateDre(record) {
   if (!record.month) throw new Error("Informe o mes do fechamento.");
-  if (record.revenue < 0) throw new Error("Faturamento nao pode ser negativo.");
-  if (!record.incomes.length) throw new Error("Adicione pelo menos uma entrada.");
-  if (!record.expenses.length) throw new Error("Adicione pelo menos uma saida.");
+  const effective = amazonEffective(record);
+  if (!Number.isFinite(effective.revenue) || effective.revenue < 0) throw new Error("Faturamento nao pode ser negativo.");
+  if (!effective.incomes.length) throw new Error("Adicione pelo menos uma entrada.");
+  if (!effective.expenses.length) throw new Error("Adicione pelo menos uma saida.");
 
-  [...record.incomes, ...record.expenses].forEach((line) => {
+  [...effective.incomes, ...effective.expenses].forEach((line) => {
     if (!line.label) throw new Error("Informe a descricao de todas as linhas.");
-    if (line.value < 0) throw new Error("Valores nao podem ser negativos.");
+    if (!Number.isFinite(line.value) || line.value < 0) throw new Error("Valores nao podem ser negativos.");
   });
 
   const duplicatedMonth = dreRecords.find((item) => item.id !== record.id && item.monthKey === record.monthKey);
@@ -1454,36 +1459,40 @@ function handleDreTableClick(event) {
   wrapper.classList.remove("open");
   if (action === "edit") openDreModal(record);
   if (action === "details") openDreDetails(record);
-  if (action === "amazon") openAmazonImport(record.month, amazonFor(record));
   if (action === "delete") deleteDreRecord(record);
 }
 
-async function deleteDreRecord(record) {
-  if (amazonFor(record)) {
-    showToast("Este mês tem importação Amazon preservada. Edite os lançamentos manuais ou reimporte o CSV.");
-    return;
-  }
-  if (!confirm(`Excluir a DRE de ${formatMonth(record.month)}?`)) return;
+function deleteDreRecord(record) {
+  pendingDreDeleteId = record.id;
+  dom.confirmDreDeleteText.textContent = `Excluir a DRE de ${formatMonth(record.month)}?`;
+  dom.confirmDreDeleteError.textContent = "";
+  dom.confirmDreDeleteDialog.showModal();
+}
 
-  if (backendEnabled) {
-    await apiRequest(`/api/dre/${encodeURIComponent(record.id)}`, { method: "DELETE" });
-  } else {
-    await writeStores([DRE_STORE], ({ dreRecords: store }) => {
-      store.delete(record.id);
-    });
+async function confirmDeleteDreRecord() {
+  const recordId = pendingDreDeleteId;
+  if (!recordId) return;
+  dom.confirmDreDelete.disabled = true;
+  try {
+    if (backendEnabled) {
+      await apiRequest(`/api/dre/${encodeURIComponent(recordId)}`, { method: "DELETE" });
+    } else {
+      await writeStores([DRE_STORE], ({ dreRecords: store }) => {
+        store.delete(recordId);
+      });
+    }
+    dom.confirmDreDeleteDialog.close();
+    await refreshData();
+    showToast("Fechamento excluido.");
+  } catch (error) {
+    dom.confirmDreDeleteError.textContent = error.message || "Nao foi possivel excluir o fechamento.";
+  } finally {
+    dom.confirmDreDelete.disabled = false;
   }
-
-  await refreshData();
-  showToast("Fechamento excluido.");
 }
 
 function updateDrePreview() {
-  const record = {
-    month: dom.dreMonth.value,
-    revenue: toMoneyNumber(dom.dreRevenue.value),
-    incomes: readDreLines(dom.dreIncomeRows),
-    expenses: readDreLines(dom.dreExpenseRows),
-  };
+  const record = buildDreFromForm();
   const calc = calculateDre(record);
   dom.dreIncomeTotal.textContent = currency.format(calc.incomeTotal);
   dom.dreExpenseTotal.textContent = currency.format(calc.expenseTotal);
@@ -1502,7 +1511,6 @@ function calculateDre(record) {
 
 function openDreDetails(record) {
   const calc = calculateDre(record);
-  const imported = amazonFor(record);
   record = amazonEffective(record);
   dom.detailsTitle.textContent = `DRE ${formatMonth(record.month)}`;
   dom.detailsContent.innerHTML = `
@@ -1517,7 +1525,6 @@ function openDreDetails(record) {
       ${dreDetailsTable("Entradas", record.incomes || [])}
       ${dreDetailsTable("Saidas", record.expenses || [])}
     </div>
-    ${imported ? amazonReportHtml(imported) : ""}
   `;
   dom.detailsDialog.showModal();
 }
