@@ -166,6 +166,52 @@ class StorageTests(unittest.TestCase):
             server.amazon_preview(self.conn, self.payload)
         self.assertEqual(server.post_permission("/api/dre/amazon/confirm"), "dre:write")
 
+    def test_delete_imported_month_archives_without_losing_original(self):
+        imported = self.confirm()
+        self.assertTrue(server.delete_dre_month(self.conn, "original", {"id": "test"}))
+        self.conn.commit()
+        self.assertEqual(server.select_active_json(self.conn, "dre_records"),
+                         [{**self.original, "id": "old", "month": "2026-08", "monthKey": "2026-08"}])
+        self.assertEqual(server.amazon_imports(self.conn), [])
+        reports = [json.loads(row[0]) for row in self.conn.execute(
+            "SELECT data FROM amazon_dre_imports WHERE month_key = ? ORDER BY revision", ("2026-09",))]
+        self.assertEqual(reports[0], imported)
+        self.assertTrue(reports[1]["archived"])
+        self.assertEqual(reports[1]["revision"], 2)
+        self.assertFalse(server.delete_dre_month(self.conn, "original", {"id": "test"}))
+
+    def test_delete_import_only_month_and_reimport(self):
+        self.confirm()
+        self.assertTrue(server.delete_dre_month(self.conn, "amazon-2026-09", {"id": "test"}))
+        self.conn.commit()
+        self.assertEqual(server.amazon_imports(self.conn), [])
+        preview = server.amazon_preview(self.conn, self.payload)
+        self.assertEqual(preview["revision"], 2)
+        self.assertEqual(len(preview["manual"]), 3)
+        restored = server.confirm_amazon_import(self.conn, {**self.payload, "token": preview["token"],
+            "reimport": True, "excludedManual": []}, {"id": "test"})
+        self.conn.commit()
+        self.assertEqual(restored["revision"], 3)
+        self.assertEqual(len(server.amazon_imports(self.conn)), 1)
+        self.assertEqual(server.amazon_imports(self.conn)[0]["revision"], 3)
+
+    def test_delete_imported_month_after_edit_creates_synthetic_id_record(self):
+        self.confirm()
+        self.conn.execute("UPDATE dre_records SET id = ?, data = ? WHERE id = ?", (
+            "amazon-2026-09", json.dumps({**self.original, "id": "amazon-2026-09"}), "original"))
+        self.conn.commit()
+        self.assertTrue(server.delete_dre_month(self.conn, "amazon-2026-09", {"id": "test"}))
+        self.conn.commit()
+        self.assertEqual(self.conn.execute("SELECT active FROM dre_records WHERE id = ?", ("amazon-2026-09",)).fetchone()[0], 0)
+        self.assertEqual(server.amazon_imports(self.conn), [])
+        self.assertEqual(len(server.select_active_json(self.conn, "dre_records")), 1)
+
+    def test_delete_manual_month_keeps_other_months(self):
+        self.assertTrue(server.delete_dre_month(self.conn, "old", {"id": "test"}))
+        self.conn.commit()
+        self.assertEqual([r["month"] for r in server.select_active_json(self.conn, "dre_records")], ["2026-09"])
+        self.assertEqual(server.get_json_by_id(self.conn, "dre_records", "old")["notes"], "preserve me")
+
 
 if __name__ == "__main__":
     unittest.main()
