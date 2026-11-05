@@ -11,7 +11,7 @@ function addAmazonDreLine(line, record) {
   if ((record?.amazonExcludedLines || []).includes(line.id)) return;
   const edit = record?.amazonLineOverrides?.[line.id] || {};
   row.innerHTML = `<label>Descrição<input class="dre-line-label" maxlength="100" value="${escapeAttribute(edit.label ?? line.label)}" required /></label>
-    <label>Valor<input class="dre-line-value" type="number" min="0" step="0.01" value="${edit.value ?? line.cents / 100}" required /></label>
+    <label>Valor<input class="dre-line-value" type="number" min="0" step="0.01" value="${edit.value ?? line.cents / 100}" /></label>
     <button class="danger-button" type="button" data-remove-dre-line>Remover</button>`;
   row.querySelector("[data-remove-dre-line]").addEventListener("click", () => { row.remove(); updateDrePreview(); });
   row.querySelectorAll("input").forEach((input) => input.addEventListener("input", updateDrePreview));
@@ -72,17 +72,20 @@ async function populateDreFromAmazonCsv(event) {
     }
     for (const row of document.querySelectorAll(".dre-line-row[data-csv-filled]")) {
       if (row.dataset.csvFilled === "added") row.remove();
-      else row.querySelector(".dre-line-value").value = 0;
+      else row.querySelector(".dre-line-value").value = row.dataset.csvPreviousValue ?? "";
       delete row.dataset.csvFilled;
+      delete row.dataset.csvPreviousValue;
     }
     document.querySelectorAll(".dre-line-row[data-amazon-source]").forEach((row) => row.remove());
     for (const line of preview.report.lines) {
       const container = line.side === "income" ? dom.dreIncomeRows : dom.dreExpenseRows;
       const match = [...container.querySelectorAll(".dre-line-row:not([data-amazon-source])")]
-        .find((row) => !row.dataset.csvFilled && row.querySelector(".dre-line-label").value.trim().toLocaleLowerCase("pt-BR") === line.label.toLocaleLowerCase("pt-BR")
+        .find((row) => !row.dataset.csvFilled && normalizeDreCsvLabel(row.querySelector(".dre-line-label").value) === normalizeDreCsvLabel(line.label)
           && toMoneyNumber(row.querySelector(".dre-line-value").value) === 0);
       if (match) {
-        match.querySelector(".dre-line-value").value = line.cents / 100;
+        const valueInput = match.querySelector(".dre-line-value");
+        match.dataset.csvPreviousValue = valueInput.value;
+        valueInput.value = line.cents / 100;
         match.dataset.csvFilled = "existing";
       } else {
         addDreLine(line.side, { id: uid(), label: line.label, value: line.cents / 100 });
@@ -96,6 +99,10 @@ async function populateDreFromAmazonCsv(event) {
   } finally {
     button.disabled = false;
   }
+}
+
+function normalizeDreCsvLabel(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
 }
 
 function amazonFor(record) {
