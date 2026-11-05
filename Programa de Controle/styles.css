@@ -297,6 +297,25 @@ h3 {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.dre-period-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.dre-period-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.dre-period-controls + .dre-metrics { margin-top: 14px; }
+
 .dre-metrics .metric {
   padding: 14px 12px;
 }
@@ -640,6 +659,11 @@ th.numeric {
   width: min(1180px, calc(100vw - 28px));
 }
 
+.dre-modal {
+  width: min(1480px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+}
+
 .modal::backdrop {
   background: rgba(15, 22, 18, 0.48);
 }
@@ -804,6 +828,18 @@ th.numeric {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.dre-line-row {
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 150px) auto;
+}
+
+.dre-line-row input {
+  min-width: 0;
+}
+
+@media (max-width: 1150px) {
+  .dre-editor { grid-template-columns: 1fr; }
 }
 
 .dre-summary {

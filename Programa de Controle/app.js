@@ -178,6 +178,9 @@ const dom = {
   metricDreExpense: document.getElementById("metricDreExpense"),
   metricDreProfit: document.getElementById("metricDreProfit"),
   metricDreMargin: document.getElementById("metricDreMargin"),
+  drePeriodType: document.getElementById("drePeriodType"),
+  drePeriodChoice: document.getElementById("drePeriodChoice"),
+  drePeriodChoiceWrap: document.getElementById("drePeriodChoiceWrap"),
   cashForm: document.getElementById("cashForm"),
   cashInvestmentBalance: document.getElementById("cashInvestmentBalance"),
   metricCashInvestments: document.getElementById("metricCashInvestments"),
@@ -597,6 +600,8 @@ function bindEvents() {
   dom.dreExpenseRows.addEventListener("input", updateDrePreview);
   dom.dreRevenue.addEventListener("input", updateDrePreview);
   dom.dreBody.addEventListener("click", handleDreTableClick);
+  dom.drePeriodType.addEventListener("change", () => { dom.drePeriodChoice.value = ""; renderDreMetrics(); });
+  dom.drePeriodChoice.addEventListener("change", renderDreMetrics);
   dom.confirmDreDelete.addEventListener("click", confirmDeleteDreRecord);
   dom.cancelDreDelete.addEventListener("click", () => dom.confirmDreDeleteDialog.close());
   dom.confirmDreDeleteDialog.addEventListener("close", () => { pendingDreDeleteId = null; });
@@ -1277,9 +1282,25 @@ function dreRow(record) {
 }
 
 function renderDreMetrics() {
-  const year = currentYearKey();
-  const annualRecords = amazonDreRecords().filter((record) => String(record.monthKey || record.month || "").startsWith(`${year}-`));
-  const annual = annualRecords.reduce(
+  const records = amazonDreRecords();
+  const type = dom.drePeriodType.value || "year";
+  const choices = [...new Map(records.map((record) => {
+    const key = drePeriodKey(type, record.monthKey || record.month);
+    return key ? [key, drePeriodLabel(type, key)] : [null, null];
+  }).filter(([key]) => key)).entries()].sort(([a], [b]) => b.localeCompare(a));
+  const selected = dom.drePeriodChoice.value;
+  dom.drePeriodChoice.innerHTML = choices.map(([key, label]) => `<option value="${key}">${label}</option>`).join("");
+  if (choices.some(([key]) => key === selected)) dom.drePeriodChoice.value = selected;
+  else if (type === "year" && choices.some(([key]) => key === currentYearKey())) dom.drePeriodChoice.value = currentYearKey();
+  dom.drePeriodChoiceWrap.hidden = type === "all";
+  const period = dom.drePeriodChoice.value;
+  const periodLabel = type === "all" ? "todo o período" : drePeriodLabel(type, period);
+  for (const [id, title] of [["metricDreRevenueLabel", "Faturamento"], ["metricDreIncomeLabel", "Entradas"],
+    ["metricDreExpenseLabel", "Saídas"], ["metricDreProfitLabel", "Lucro líquido"], ["metricDreMarginLabel", "Margem"]]) {
+    document.getElementById(id).textContent = `${title} ${periodLabel}`;
+  }
+  const selectedRecords = records.filter((record) => type === "all" || drePeriodKey(type, record.monthKey || record.month) === period);
+  const totals = selectedRecords.reduce(
     (totals, record) => {
       const calc = calculateDre(record);
       totals.revenue += amazonEffective(record).revenue || 0;
@@ -1291,11 +1312,28 @@ function renderDreMetrics() {
     { revenue: 0, income: 0, expense: 0, netProfit: 0 },
   );
 
-  dom.metricDreRevenue.textContent = currency.format(annual.revenue);
-  dom.metricDreIncome.textContent = currency.format(annual.income);
-  dom.metricDreExpense.textContent = currency.format(annual.expense);
-  dom.metricDreProfit.textContent = currency.format(annual.netProfit);
-  dom.metricDreMargin.textContent = formatPercent(annual.revenue > 0 ? (annual.netProfit / annual.revenue) * 100 : 0);
+  dom.metricDreRevenue.textContent = currency.format(totals.revenue);
+  dom.metricDreIncome.textContent = currency.format(totals.income);
+  dom.metricDreExpense.textContent = currency.format(totals.expense);
+  dom.metricDreProfit.textContent = currency.format(totals.netProfit);
+  dom.metricDreMargin.textContent = formatPercent(totals.revenue > 0 ? (totals.netProfit / totals.revenue) * 100 : 0);
+}
+
+function drePeriodKey(type, month) {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month || ""));
+  if (!match) return "";
+  const year = match[1];
+  const number = Number(match[2]);
+  if (type === "quarter") return `${year}-Q${Math.ceil(number / 3)}`;
+  if (type === "semester") return `${year}-H${Math.ceil(number / 6)}`;
+  return year;
+}
+
+function drePeriodLabel(type, key) {
+  if (!key) return "sem meses cadastrados";
+  if (type === "quarter") return `${key.slice(-1)}º trimestre de ${key.slice(0, 4)}`;
+  if (type === "semester") return `${key.slice(-1)}º semestre de ${key.slice(0, 4)}`;
+  return key;
 }
 
 function openDreModal(record = null) {
@@ -1315,8 +1353,12 @@ function openDreModal(record = null) {
   } else {
     dom.dreMonth.value = new Date().toISOString().slice(0, 7);
     dom.dreRevenue.value = 0;
-    DEFAULT_DRE_INCOMES.forEach((label) => addDreLine("income", { label, value: 0 }));
-    DEFAULT_DRE_EXPENSES.forEach((label) => addDreLine("expense", { label, value: 0 }));
+    const october = amazonDreRecords().find((item) => (item.monthKey || item.month) === "2026-10");
+    const template = october ? amazonEffective(october) : null;
+    const incomes = template?.incomes?.length ? template.incomes.map((line) => line.label) : DEFAULT_DRE_INCOMES;
+    const expenses = template?.expenses?.length ? template.expenses.map((line) => line.label) : DEFAULT_DRE_EXPENSES;
+    incomes.forEach((label) => addDreLine("income", { label, value: "" }));
+    expenses.forEach((label) => addDreLine("expense", { label, value: "" }));
   }
 
   const imported = amazonFor(record);
@@ -1346,7 +1388,7 @@ function addDreLine(type, line = null) {
     </label>
     <label>
       Valor
-      <input class="dre-line-value" type="number" min="0" step="0.01" value="${line ? line.value : 0}" required />
+      <input class="dre-line-value" type="number" min="0" step="0.01" value="${line ? line.value : 0}" />
     </label>
     <button class="danger-button" type="button" data-remove-dre-line>Remover</button>
   `;

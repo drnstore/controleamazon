@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Controle Amazon - Estoque</title>
-    <link rel="stylesheet" href="styles.css?v=35" />
+    <link rel="stylesheet" href="styles.css?v=37" />
   </head>
   <body>
     <aside class="sidebar" aria-label="Navegacao principal">
@@ -300,25 +300,39 @@
           </button>
         </header>
 
+        <div class="dre-period-controls" aria-label="Período dos indicadores da DRE">
+          <label>Período
+            <select id="drePeriodType">
+              <option value="year">Ano</option>
+              <option value="quarter">Trimestre</option>
+              <option value="semester">Semestre</option>
+              <option value="all">Todo o período</option>
+            </select>
+          </label>
+          <label id="drePeriodChoiceWrap">Selecionar
+            <select id="drePeriodChoice"></select>
+          </label>
+        </div>
+
         <section class="metrics dre-metrics" aria-label="Resumo da DRE">
           <div class="metric">
-            <span>Faturamento 2026</span>
+            <span id="metricDreRevenueLabel">Faturamento 2026</span>
             <strong id="metricDreRevenue">R$ 0,00</strong>
           </div>
           <div class="metric">
-            <span>Entradas 2026</span>
+            <span id="metricDreIncomeLabel">Entradas 2026</span>
             <strong id="metricDreIncome">R$ 0,00</strong>
           </div>
           <div class="metric">
-            <span>Saidas 2026</span>
+            <span id="metricDreExpenseLabel">Saídas 2026</span>
             <strong id="metricDreExpense">R$ 0,00</strong>
           </div>
           <div class="metric">
-            <span>Lucro liquido 2026</span>
+            <span id="metricDreProfitLabel">Lucro líquido 2026</span>
             <strong id="metricDreProfit">R$ 0,00</strong>
           </div>
           <div class="metric">
-            <span>Margem 2026</span>
+            <span id="metricDreMarginLabel">Margem 2026</span>
             <strong id="metricDreMargin">0%</strong>
           </div>
         </section>
@@ -786,7 +800,7 @@
       </form>
     </dialog>
 
-    <dialog id="dreDialog" class="modal details-modal">
+    <dialog id="dreDialog" class="modal dre-modal">
       <form id="dreForm" method="dialog">
         <div class="modal-header">
           <div>
@@ -810,7 +824,7 @@
         <div class="section-heading">
           <button id="openAmazonImport" class="secondary-button" type="button">Importar CSV Amazon</button>
           <input id="dreCsvFile" type="file" accept=".csv,text/csv" hidden />
-          <p>Selecione o mês e importe para preencher as entradas e saídas abaixo.</p>
+          <p>Os campos seguem o modelo de 10/2026. O CSV preenche os valores encontrados; os demais ficam em branco para você completar.</p>
         </div>
 
         <div class="dre-editor">
@@ -1024,7 +1038,7 @@
       <div id="amazonImportPreview" aria-live="polite"></div>
       <div class="modal-actions"><button type="button" id="cancelAmazonImport" class="ghost-button">Cancelar</button><button type="button" id="confirmAmazonImport" class="primary-button" hidden>Confirmar Importação</button></div>
     </dialog>
-    <script src="amazon-dre.js?v=2"></script>
-    <script src="app.js?v=40"></script>
+    <script src="amazon-dre.js?v=3"></script>
+    <script src="app.js?v=42"></script>
   </body>
 </html>
