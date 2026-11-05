@@ -206,6 +206,7 @@ const dom = {
   metricAccountIn: document.getElementById("metricAccountIn"),
   metricAccountOut: document.getElementById("metricAccountOut"),
   metricAccountBalance: document.getElementById("metricAccountBalance"),
+  metricAccountAvailable: document.getElementById("metricAccountAvailable"),
   metricAccountEntries: document.getElementById("metricAccountEntries"),
   accountEntryDialog: document.getElementById("accountEntryDialog"),
   accountEntryForm: document.getElementById("accountEntryForm"),
@@ -1681,6 +1682,10 @@ function renderAccount() {
   dom.metricAccountBalance.textContent = currency.format(totals.balance);
   dom.metricAccountBalance.classList.toggle("negative-value", totals.balance < 0);
   dom.metricAccountBalance.classList.toggle("positive-value", totals.balance >= 0);
+  const availableBalance = totals.balance - investmentBalance;
+  dom.metricAccountAvailable.textContent = currency.format(availableBalance);
+  dom.metricAccountAvailable.classList.toggle("negative-value", availableBalance < 0);
+  dom.metricAccountAvailable.classList.toggle("positive-value", availableBalance >= 0);
   dom.metricAccountEntries.textContent = number.format(visibleEntries.length);
   if (document.activeElement !== dom.accountOpeningBalance) {
     dom.accountOpeningBalance.value = Number(openingBalance || 0).toFixed(2);
