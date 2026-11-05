@@ -65,6 +65,28 @@ dialog{container:records / inline-size}
  .sidebar .brand,.sidebar .brand>div{min-width:0}
  dialog :is(.form-grid,.details-grid,.dre-summary,.dre-editor,.dre-line-row,.account-bulk-row,.import-layout,.purchase-item-row,.shipment-product-row){grid-template-columns:minmax(0,1fr)}
 }
+#shipmentsView .shipments-filters{margin-bottom:18px}
+.purchase-items .purchase-item-chip,.purchases-table .status-pill{background:var(--panel-soft);color:var(--text);border:1px solid var(--line);padding:5px 9px;border-radius:8px;line-height:1.35}
+.purchases-table .status-pill::before{background:var(--signal)}
+.inventory-table .product-info{background:transparent;border:0;padding:0;justify-content:flex-start}
+.inventory-table .product-thumb{flex:0 0 64px;width:64px;height:64px;border:0;background:transparent}
+.inventory-table .product-thumb img{object-fit:contain}
+.inventory-table .product-cell strong{display:block;height:auto;max-width:none;overflow:visible;white-space:normal;line-height:1.4}
+@container records (min-width:760px) and (max-width:1440px){
+ #dreView .dre-table tbody tr{grid-template-columns:.85fr repeat(4,minmax(0,1.3fr)) .65fr .9fr;gap:8px;align-items:start}
+}
+@container records (max-width:1440px){
+ :is(#inventoryBody,#purchasesBody){padding:12px;display:grid;gap:14px}
+ :is(#inventoryBody,#purchasesBody)>tr{background:var(--panel);border:1px solid var(--line);border-inline-start:3px solid var(--signal);border-radius:12px;padding:16px;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,8.8rem),1fr))}
+ :is(#inventoryBody,#purchasesBody)>tr>td{width:auto;min-width:0;text-align:start;border-top:1px solid var(--line);padding-top:8px}
+ #inventoryBody .product-cell,#purchasesBody td:nth-child(2){grid-column:1/-1;grid-row:1;border:0;padding:0}
+ #inventoryBody .product-cell::before{display:none}
+ #inventoryBody .product-info{margin:0;justify-content:flex-start}
+ #purchasesBody .purchase-items{display:flex;flex-wrap:wrap;max-width:100%}
+ #purchasesBody .purchase-address{white-space:normal;max-width:none}
+ #purchasesView th:has(#selectAllRetiradaPurchases){display:flex;align-items:center;width:auto;text-align:start}
+ #selectAllRetiradaPurchases{width:18px;height:18px;margin:0}
+}
 </style></head>
   <body>
     <aside class="sidebar" aria-label="Navegacao principal">
@@ -466,7 +488,7 @@ dialog{container:records / inline-size}
                 <input id="cashAmazonReceivable" type="number" min="0" step="0.01" required />
               </label>
             </div>
-            <p class="dashboard-subtitle">Informe o valor em conta sem incluir os investimentos. O saldo de investimentos do Caixa é independente do saldo informado na aba Conta.</p>
+            <p class="dashboard-subtitle" id="cashSourceHint"></p>
             <p id="cashError" class="form-error" role="alert"></p>
             <div class="modal-actions">
               <button class="primary-button" type="submit">Salvar Caixa</button>
@@ -1104,7 +1126,7 @@ dialog{container:records / inline-size}
       <div class="modal-actions"><button type="button" id="cancelAmazonImport" class="ghost-button">Cancelar</button><button type="button" id="confirmAmazonImport" class="primary-button" hidden>Confirmar Importação</button></div>
     </dialog>
     <script src="amazon-dre.js?v=3"></script>
-    <script src="app.js?v=44"></script>
+    <script src="app.js?v=45"></script>
   <script>
 (()=>{
  const theme=document.querySelector('#themeSwitch'),rail=document.querySelector('.nav-tabs'),toggle=document.querySelector('#railToggle');
