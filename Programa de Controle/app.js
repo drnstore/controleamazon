@@ -795,9 +795,9 @@ function calculateUpcomingShipmentQuantity(records, now = currentDateTimeKey()) 
 
 function renderDashboard() {
   const inventory = calculateInventoryTotals();
-  const accountValue = Math.max(0, Number(cashState.accountValue || 0));
+  const {accountValue, investmentBalance} = cashAccountSource();
   const amazonReceivable = Math.max(0, Number(cashState.amazonReceivable || 0));
-  const cashTotal = inventory.stockValue + accountValue + amazonReceivable + Number(cashState.investmentBalance || 0);
+  const cashTotal = inventory.stockValue + accountValue + amazonReceivable + investmentBalance;
   const purchaseStatusCounts = countBy(purchases, (purchase) => purchase.status || "Sem status");
   const nextShipment = shipments.find((shipment) => `${shipment.date} ${shipment.time}` >= currentDateTimeKey());
   const nextShipmentQty = nextShipment
@@ -1596,23 +1596,31 @@ function dreDetailsTable(title, lines) {
   `;
 }
 
+function cashAccountSource() {
+  const month = [...accountMonths, ...accountEntries].reduce((latest, row) =>
+    row.monthKey > latest ? row.monthKey : latest, "");
+  if (!month) return { month, accountValue: cashState.accountValue || 0, investmentBalance: cashState.investmentBalance || 0 };
+  const entries = accountEntries.filter(entry => entry.monthKey === month);
+  const available = calculateAccountTotals(entries, getAccountOpeningBalance(month)).balance;
+  return { month, accountValue: Math.round(available * 100) / 100, investmentBalance: getAccountInvestmentBalance(month) };
+}
 function renderCash() {
   const stockValue = calculateStockTotalValue();
-  const accountValue = Math.max(0, Number(cashState.accountValue || 0));
+  const {month, accountValue, investmentBalance} = cashAccountSource();
   const amazonReceivable = Math.max(0, Number(cashState.amazonReceivable || 0));
-  const investmentBalance = Math.max(0, Number(cashState.investmentBalance || 0));
   const total = stockValue + accountValue + amazonReceivable + investmentBalance;
   dom.metricCashInvestments.textContent = currency.format(investmentBalance);
-  if (document.activeElement !== dom.cashInvestmentBalance) {
-    dom.cashInvestmentBalance.value = investmentBalance.toFixed(2);
-  }
-
+  dom.cashInvestmentBalance.readOnly = dom.cashAccountValue.readOnly = Boolean(month);
+  document.getElementById("cashSourceHint").textContent = month
+    ? "Saldo disponível e investimentos da Conta em " + formatMonth(month) + ". O valor a receber da Amazon é informado aqui."
+    : "Sem mês cadastrado na Conta. Os valores do Caixa podem ser informados manualmente.";
+  dom.cashInvestmentBalance.value = Number(investmentBalance).toFixed(2);
   dom.metricCashStock.textContent = currency.format(stockValue);
   dom.metricCashAccount.textContent = currency.format(accountValue);
   dom.metricCashAmazon.textContent = currency.format(amazonReceivable);
   dom.metricCashTotal.textContent = currency.format(total);
 
-  if (document.activeElement !== dom.cashAccountValue) {
+  if (month || document.activeElement !== dom.cashAccountValue) {
     dom.cashAccountValue.value = accountValue;
   }
   if (document.activeElement !== dom.cashAmazonReceivable) {
@@ -1639,8 +1647,8 @@ async function saveCashState(event) {
     const updated = {
       ...cashState,
       id: "main",
-      investmentBalance: toMoneyNumber(dom.cashInvestmentBalance.value),
-      accountValue: toMoneyNumber(dom.cashAccountValue.value),
+      investmentBalance: dom.cashInvestmentBalance.readOnly ? cashState.investmentBalance : toMoneyNumber(dom.cashInvestmentBalance.value),
+      accountValue: dom.cashAccountValue.readOnly ? cashState.accountValue : toMoneyNumber(dom.cashAccountValue.value),
       amazonReceivable: toMoneyNumber(dom.cashAmazonReceivable.value),
       updatedAt: Date.now(),
     };
