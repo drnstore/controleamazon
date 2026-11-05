@@ -457,7 +457,7 @@
           </form>
         </section>
 
-        <p class="dashboard-subtitle">Saldo final = saldo começo do mês + saldo investimentos + entradas − saídas.</p>
+        <p class="dashboard-subtitle">Saldo final = saldo começo do mês + saldo investimentos + entradas − saídas. Saldo em conta = saldo final − investimentos.</p>
         <section class="metrics" aria-label="Resumo da conta">
           <div class="metric">
             <span>Saldo inicial</span>
@@ -478,6 +478,10 @@
           <div class="metric">
             <span>Saldo final do mes</span>
             <strong id="metricAccountBalance">R$ 0,00</strong>
+          </div>
+          <div class="metric">
+            <span>Saldo em conta</span>
+            <strong id="metricAccountAvailable">R$ 0,00</strong>
           </div>
           <div class="metric">
             <span>Lancamentos</span>
@@ -1039,6 +1043,6 @@
       <div class="modal-actions"><button type="button" id="cancelAmazonImport" class="ghost-button">Cancelar</button><button type="button" id="confirmAmazonImport" class="primary-button" hidden>Confirmar Importação</button></div>
     </dialog>
     <script src="amazon-dre.js?v=3"></script>
-    <script src="app.js?v=42"></script>
+    <script src="app.js?v=43"></script>
   </body>
 </html>
