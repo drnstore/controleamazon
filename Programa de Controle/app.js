@@ -193,6 +193,7 @@ const dom = {
   metricCashTotal: document.getElementById("metricCashTotal"),
   accountMonthFilter: document.getElementById("accountMonthFilter"),
   accountOpeningBalance: document.getElementById("accountOpeningBalance"),
+  accountOpeningHint: document.getElementById("accountOpeningHint"),
   accountInvestmentBalance: document.getElementById("accountInvestmentBalance"),
   metricAccountInvestments: document.getElementById("metricAccountInvestments"),
   accountOpeningForm: document.getElementById("accountOpeningForm"),
@@ -1687,9 +1688,10 @@ function renderAccount() {
   dom.metricAccountAvailable.classList.toggle("negative-value", availableBalance < 0);
   dom.metricAccountAvailable.classList.toggle("positive-value", availableBalance >= 0);
   dom.metricAccountEntries.textContent = number.format(visibleEntries.length);
-  if (document.activeElement !== dom.accountOpeningBalance) {
-    dom.accountOpeningBalance.value = Number(openingBalance || 0).toFixed(2);
-  }
+  dom.accountOpeningBalance.value = Number(openingBalance || 0).toFixed(2);
+  dom.accountOpeningHint.textContent = getAccountMonthState(monthKey)?.openingBalanceAuto === true || !getAccountMonthState(monthKey)
+    ? "Calculado a partir do saldo em conta do mês anterior."
+    : "Valor já registrado para este mês, preservado como histórico.";
 
   if (document.activeElement !== dom.accountInvestmentBalance) {
     dom.accountInvestmentBalance.value = investmentBalance.toFixed(2);
@@ -1715,7 +1717,14 @@ function getAccountMonthState(monthKey = dom.accountMonthFilter.value || current
 }
 
 function getAccountOpeningBalance(monthKey = dom.accountMonthFilter.value || currentMonthKey()) {
-  return Number(getAccountMonthState(monthKey)?.openingBalance || 0);
+  const saved = getAccountMonthState(monthKey);
+  if (saved && saved.openingBalanceAuto !== true) return Number(saved.openingBalance || 0);
+  const anchor = accountMonths
+    .filter((item) => item.openingBalanceAuto !== true && item.monthKey < monthKey)
+    .sort((a, b) => b.monthKey.localeCompare(a.monthKey))[0];
+  const entries = accountEntries.filter((entry) => entry.monthKey >= (anchor?.monthKey || "") && entry.monthKey < monthKey);
+  const opening = Number(anchor?.openingBalance || 0) + calculateAccountTotals(entries).balance;
+  return Math.round(opening * 100) / 100;
 }
 
 function getAccountInvestmentBalance(monthKey = dom.accountMonthFilter.value || currentMonthKey()) {
@@ -1745,16 +1754,18 @@ async function saveAccountOpeningBalance(event) {
   try {
     ensureAccountMonth();
     const monthKey = dom.accountMonthFilter.value || currentMonthKey();
-    const openingBalance = toMoneyNumber(dom.accountOpeningBalance.value);
+    const previousState = getAccountMonthState(monthKey);
+    const openingBalance = getAccountOpeningBalance(monthKey);
     const investmentBalance = toMoneyNumber(dom.accountInvestmentBalance.value);
     if (!Number.isFinite(openingBalance) || !Number.isFinite(investmentBalance)) {
       throw new Error("Informe valores válidos para os saldos.");
     }
     const monthState = {
-      ...getAccountMonthState(monthKey),
+      ...previousState,
       monthKey,
       openingBalance,
       investmentBalance,
+      ...(!previousState || previousState.openingBalanceAuto === true ? { openingBalanceAuto: true } : {}),
       updatedAt: Date.now(),
     };
     await saveAccountMonthState(monthState);
