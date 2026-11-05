@@ -28,7 +28,44 @@ input,select,textarea,dialog,.panel-link,.dashboard-eye-button,.user-panel>butto
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important}}
 @media(min-width:1450px){#dashboardView:not([hidden]){display:grid;grid-template-columns:minmax(234px,.78fr) minmax(0,3fr);align-items:center;gap:20px}#dashboardView .metrics{margin:0;gap:12px}#dashboardView .chart-card,#dashboardView .dashboard-grid{grid-column:1/-1;margin:0}#dashboardView .dashboard-metric{padding:15px;gap:12px;min-height:90px}#dashboardView .dashboard-metric strong{font-size:clamp(18px,1.4vw,25px)}}
 [data-theme=night] :is(.history-item,.import-preview-header,.import-preview-header span,.import-row,textarea,.product-button){background:var(--panel-soft);color:var(--text)}
-@media(prefers-reduced-motion:no-preference){body,.sidebar,.metric,.dashboard-panel,.chart-card,.modal,.table-wrap,input,select,button{transition:background-color .16s,color .16s,border-color .16s}}</style></head>
+@media(prefers-reduced-motion:no-preference){body,.sidebar,.metric,.dashboard-panel,.chart-card,.modal,.table-wrap,input,select,button{transition:background-color .16s,color .16s,border-color .16s}}/* Responsive summaries and records. Container widths also follow browser zoom. */
+#accountOpeningForm .form-grid{align-items:start}
+#accountOpeningForm label{align-content:start}
+.app-shell,.app-shell section,.modal form,.form-grid>*,.modal input,.modal select{min-width:0}
+.app-shell .metrics:not(#dashboardView .metrics){grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr));gap:clamp(6px,.75vw,12px);overflow:visible}
+.app-shell .metrics .metric:not(.dashboard-metric){padding:clamp(8px,1vw,16px);display:flex;flex-direction:column;justify-content:space-between;gap:6px;overflow-wrap:anywhere}
+.app-shell .metric:not(.dashboard-metric) strong{font-size:clamp(1rem,1.45vw,1.45rem);line-height:1.2}
+.chart-plot svg{min-width:0}
+.app-shell :is(.header-actions,.filters,.toolbar,.chart-key,.panel-heading){flex-wrap:wrap}
+.app-shell :is(.header-actions,.filters,.toolbar) > *{min-width:0;max-width:100%}
+.table-wrap,dialog .mini-table,dialog .import-preview{max-width:100%}
+.table-wrap{container:records / inline-size}
+dialog{container:records / inline-size}
+@container records (max-width: 1440px){
+ :is(.table-wrap,dialog) table:has(thead),.import-preview table:has(thead){display:block;width:100%;min-width:0}
+ table:has(thead) thead:not(:has(input)){position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
+ table thead:has(input),table thead:has(input) tr{display:block}
+ table thead:has(input) th:not(:has(input)){position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
+ th:has(#selectAllRetiradaPurchases)::after{content:"Selecionar compras em retirada";margin-inline-start:.5em}
+ table:has(thead) tbody{display:block}
+ table:has(thead) tbody tr{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:12px 16px;padding:14px;border-bottom:1px solid var(--line)}
+ table:has(thead) tbody td{display:block;min-width:0;max-width:none;width:auto;padding:0;border:0;text-align:start;overflow-wrap:anywhere;white-space:normal}
+ td[data-field]::before{content:attr(data-field);display:block;color:var(--muted);font-size:.75rem;font-weight:600;margin-bottom:4px}
+ td .actions,td .action-menu,td .product-info,td .product-button{min-width:0;max-width:100%;width:100%;height:auto}
+ td .action-menu{position:static;margin-top:4px}
+ td :is(.account-notes,.product-name,.product-info strong,.shipment-location,.status-pill){white-space:normal;max-width:100%;overflow-wrap:anywhere}
+}
+@media(max-width:760px){
+ .app-shell :is(.page-header,.dashboard-panel,.filters,.toolbar,.form-grid,.details-grid,.header-actions){min-width:0}
+ .app-shell :is(input,select,textarea),dialog :is(input,select,textarea){min-width:0;max-width:100%}
+ .app-shell .header-actions{width:100%}
+ .app-shell .header-actions button{flex:1 1 9rem;white-space:normal}
+ .nav-tabs,.nav-tabs.expanded{max-height:none;flex-wrap:nowrap}
+ .app-shell .dashboard-metric strong{white-space:normal;overflow-wrap:anywhere}
+ .sidebar .brand,.sidebar .brand>div{min-width:0}
+ dialog :is(.form-grid,.details-grid,.dre-summary,.dre-editor,.dre-line-row,.account-bulk-row,.import-layout,.purchase-item-row,.shipment-product-row){grid-template-columns:minmax(0,1fr)}
+}
+</style></head>
   <body>
     <aside class="sidebar" aria-label="Navegacao principal">
       <div class="brand">
@@ -1089,5 +1126,25 @@ input,select,textarea,dialog,.panel-link,.dashboard-eye-button,.user-panel>butto
  }
  new MutationObserver(draw).observe(document.querySelector('#dashboardDreList'),{childList:true});draw();
 })();
-</script></body>
+</script><script>
+/* Keep card captions in sync with the actual table headings when rows are rendered. */
+(()=>{
+ function caption(row){
+   const headings=row.closest('table')?.tHead?.rows[0]?.cells;
+   if(!headings)return;
+   Array.from(row.cells).forEach((cell,i)=>{
+     const h=headings[i];if(h)cell.dataset.field=h.textContent.trim()||'Selecionar';
+   });
+ }
+ function scan(el){
+   if(el.nodeType!==1)return;
+   if(el.matches('tbody tr'))caption(el);
+   else el.querySelectorAll('tbody tr').forEach(caption);
+ }
+ scan(document.body);
+ new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(scan)))
+   .observe(document.body,{subtree:true,childList:true});
+})();
+</script>
+</body>
 </html>
