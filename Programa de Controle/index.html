@@ -68,10 +68,11 @@ dialog{container:records / inline-size}
 #shipmentsView .shipments-filters{margin-bottom:18px}
 .purchase-items .purchase-item-chip,.purchases-table .status-pill{background:var(--panel-soft);color:var(--text);border:1px solid var(--line);padding:5px 9px;border-radius:8px;line-height:1.35}
 .purchases-table .status-pill::before{background:var(--signal)}
-.inventory-table .product-info{background:transparent;border:0;padding:0;justify-content:flex-start}
+.inventory-table .product-info{height:auto;background:transparent;border:0;padding:0;justify-content:flex-start}
 .inventory-table .product-thumb{flex:0 0 64px;width:64px;height:64px;border:0;background:transparent}
 .inventory-table .product-thumb img{object-fit:contain}
-.inventory-table .product-cell strong{display:block;height:auto;max-width:none;overflow:visible;white-space:normal;line-height:1.4}
+.inventory-table .product-info>div:last-child{min-width:0}
+.inventory-table .product-cell strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;height:auto;max-width:none;overflow:hidden;white-space:normal;line-height:1.4}
 @container records (min-width:760px) and (max-width:1440px){
  #dreView .dre-table tbody tr{grid-template-columns:.85fr repeat(4,minmax(0,1.3fr)) .65fr .9fr;gap:8px;align-items:start}
 }
